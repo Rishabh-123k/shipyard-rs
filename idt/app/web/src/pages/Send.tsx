@@ -137,7 +137,7 @@ export function Send() {
 
           <div className="flex items-center gap-2.5 rounded-xl border border-line bg-ink px-3.5 py-3 text-sm text-muted">
             <span className="font-bold text-text">Network</span>
-            {network} · the only network this asset can be sent on from Tensho
+            {network} · the only network this asset can be sent on from IDT
           </div>
         </Card>
 
@@ -149,7 +149,7 @@ export function Send() {
           </div>
           <div className="rounded-[14px] border border-edge bg-ink px-4 py-0.5">
             <DetailRow label="To" value={addressState === "valid" ? shortAddress(recipient) : "—"} />
-            <DetailRow label="Network fee" value="Covered by Tensho" />
+            <DetailRow label="Network fee" value="Covered by gateway" />
             <DetailRow label="Recipient gets" value={quote.data ? tokenAmount(quote.data.qty, symbol) : "—"} last />
           </div>
           {quote.isFetching && !quote.data && <span className="text-xs text-faint">Preparing the transfer…</span>}

@@ -10,6 +10,7 @@ import { Home } from "./pages/Home.tsx";
 import { Journal } from "./pages/Journal.tsx";
 import { Ask } from "./pages/Ask.tsx";
 import { Markets } from "./pages/Markets.tsx";
+import { ForgotPassword, ResetPassword } from "./pages/PasswordReset.tsx";
 import { Shifts } from "./pages/Shifts.tsx";
 import { Send } from "./pages/Send.tsx";
 import { SignIn } from "./pages/SignIn.tsx";
@@ -34,6 +35,8 @@ createRoot(document.getElementById("root")!).render(
         <Routes>
           <Route path="/signup" element={<SignUp />} />
           <Route path="/login" element={<SignIn />} />
+          <Route path="/forgot-password" element={<ForgotPassword />} />
+          <Route path="/reset-password" element={<ResetPassword />} />
           <Route element={<AppShell />}>
             <Route index element={<Markets />} />
             <Route path="/shifts" element={<Shifts />} />

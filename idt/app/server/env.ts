@@ -19,6 +19,8 @@ const schema = z.object({
   API_PORT: z.coerce.number().int().positive().default(4747),
   DATA_FILE: z.string().default("data/customers.json"),
   IDT_ENGINE_URL: z.string().url().default("http://127.0.0.1:8787"),
+  // Where reset links point; the web app in dev.
+  APP_URL: z.string().url().default("http://localhost:5173"),
   // Anything but the literal "false" keeps execution disabled.
   DRY_RUN: z
     .string()

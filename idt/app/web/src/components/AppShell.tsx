@@ -1,22 +1,41 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { Activity, ArrowLeftRight, ChartSpline, History, LogOut, MessageSquareText, NotebookPen, Plus, Send, Wallet, type LucideIcon } from "lucide-react";
-import type { FormEvent, ReactNode } from "react";
+import { LogOut } from "lucide-react";
+import { useEffect, type FormEvent, type ReactNode } from "react";
 import { Navigate, NavLink, Outlet, useNavigate } from "react-router";
 import { api, ApiError, useMe } from "../api.ts";
 import type { Profile } from "../types.ts";
 import { Banner, Button, Logo, Spinner } from "./ui.tsx";
 
-const NAV: { to: string; label: string; icon: LucideIcon }[] = [
-  { to: "/", label: "Markets", icon: ChartSpline },
-  { to: "/shifts", label: "Shifts", icon: History },
-  { to: "/ask", label: "Ask", icon: MessageSquareText },
-  { to: "/wallet", label: "Wallet", icon: Wallet },
-  { to: "/trade", label: "Trade", icon: ArrowLeftRight },
-  { to: "/journal", label: "Journal", icon: NotebookPen },
-  { to: "/add-funds", label: "Add funds", icon: Plus },
-  { to: "/send", label: "Send", icon: Send },
-  { to: "/activity", label: "Activity", icon: Activity },
+// The bracketed letter is also a keyboard shortcut.
+const NAV: { to: string; label: string; key: string }[] = [
+  { to: "/", label: "Markets", key: "M" },
+  { to: "/shifts", label: "Shifts", key: "S" },
+  { to: "/ask", label: "Ask", key: "A" },
+  { to: "/trade", label: "Trade", key: "T" },
+  { to: "/journal", label: "Journal", key: "J" },
+  { to: "/wallet", label: "Wallet", key: "W" },
+  { to: "/add-funds", label: "Add funds", key: "F" },
+  { to: "/send", label: "Send", key: "D" },
+  { to: "/activity", label: "Activity", key: "Y" },
 ];
+
+function useNavShortcuts() {
+  const navigate = useNavigate();
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      if (e.metaKey || e.ctrlKey || e.altKey || e.repeat) return;
+      const target = e.target as HTMLElement | null;
+      if (target?.closest("input, textarea, select, [contenteditable='true']")) return;
+      const item = NAV.find((n) => n.key === e.key.toUpperCase());
+      if (item) {
+        e.preventDefault();
+        navigate(item.to);
+      }
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [navigate]);
+}
 
 function CustomerCard({ email }: { email: string }) {
   const queryClient = useQueryClient();
@@ -30,7 +49,7 @@ function CustomerCard({ email }: { email: string }) {
 
   return (
     <div className="mt-auto flex items-center gap-2.5 rounded-[18px] border border-edge bg-panel p-3.5">
-      <div className="flex size-9 shrink-0 items-center justify-center rounded-full bg-edge text-[13px] font-bold uppercase">
+      <div className="flex size-9 shrink-0 items-center justify-center border border-edge font-mono text-[12px] uppercase">
         {email.slice(0, 2)}
       </div>
       <span className="min-w-0 flex-1 truncate text-xs text-muted" title={email}>
@@ -45,6 +64,7 @@ function CustomerCard({ email }: { email: string }) {
 
 export function AppShell() {
   const me = useMe();
+  useNavShortcuts();
 
   if (me.error instanceof ApiError && me.error.status === 401) return <Navigate to="/login" replace />;
   if (me.isPending) {
@@ -57,7 +77,7 @@ export function AppShell() {
   if (me.error) {
     return (
       <div className="mx-auto max-w-lg p-12">
-        <Banner tone="error" title="Tensho is unreachable">
+        <Banner tone="error" title="IDT is unreachable">
           {me.error.message}
         </Banner>
       </div>
@@ -66,26 +86,23 @@ export function AppShell() {
 
   return (
     <div className="flex h-full min-w-[1100px]">
-      <aside className="flex w-[248px] shrink-0 flex-col gap-8 border-r border-line bg-night px-[18px] py-7">
+      <aside className="flex w-[232px] shrink-0 flex-col gap-8 border-r border-edge bg-night/95 px-4 py-6">
         <Logo />
-        <nav className="flex flex-col gap-1">
-          {NAV.map(({ to, label, icon: Icon }) => (
+        <nav className="flex flex-col gap-0.5" aria-label="Main">
+          {NAV.map(({ to, label, key }) => (
             <NavLink
               key={to}
               to={to}
               end={to === "/"}
+              aria-keyshortcuts={key}
               className={({ isActive }) =>
-                `flex h-11 items-center gap-3 rounded-xl px-3.5 text-[15px] no-underline ${
-                  isActive ? "bg-line font-bold text-text hover:text-text" : "text-muted hover:text-text"
+                `flex h-10 items-center gap-2.5 px-2 font-mono text-[14px] no-underline ${
+                  isActive ? "bg-text text-ink hover:text-ink" : "text-muted hover:bg-line hover:text-text"
                 }`
               }
             >
-              {({ isActive }) => (
-                <>
-                  <Icon aria-hidden className={`size-[18px] ${isActive ? "text-accent" : ""}`} />
-                  {label}
-                </>
-              )}
+              <span aria-hidden className="opacity-70">[{key}]</span>
+              {label}
             </NavLink>
           ))}
         </nav>
@@ -101,31 +118,24 @@ export function AppShell() {
 }
 
 function BrandArt() {
-  const rays = [0, 180, 360, 540, 720];
-  const horizon: [number, number, number][] = [
-    [320, 1.5, 1],
-    [345, 1, 0.55],
-    [380, 1, 0.4],
-    [430, 1, 0.25],
-  ];
   return (
-    <svg viewBox="0 0 720 480" aria-hidden className="pointer-events-none absolute bottom-0 left-0 w-full">
-      <circle cx="360" cy="250" r="150" fill="none" stroke="#FF4FA3" strokeWidth="2.5" />
-      {[
-        [215, 8],
-        [250, 11],
-        [288, 14],
-      ].map(([y, width]) => (
-        <line key={y} x1="180" y1={y} x2="540" y2={y} stroke="#0A0813" strokeWidth={width} />
-      ))}
-      <rect x="0" y="320" width="720" height="160" fill="#0A0813" />
-      {horizon.map(([y, width, opacity]) => (
-        <line key={y} x1="0" y1={y} x2="720" y2={y} stroke="#45E3FF" strokeWidth={width} opacity={opacity} />
-      ))}
-      {rays.map((x) => (
-        <line key={x} x1="360" y1="320" x2={x} y2="480" stroke="#45E3FF" strokeWidth="1" opacity="0.35" />
-      ))}
-    </svg>
+    <div aria-hidden className="pointer-events-none relative mt-auto w-full max-w-[520px] border border-text bg-ink p-3">
+      <div className="flex items-center justify-between border-b border-edge pb-2 font-mono text-[11px] text-faint">
+        <span>idt — terminal</span>
+        <span>● ● ●</span>
+      </div>
+      <pre className="m-0 pt-3 font-mono text-[12px] leading-relaxed text-muted">
+        {`> fit kalshi BTC 2026-10-30
+  strikes 50 · coherence 0.0050
+  P(BTC > spot) ............ 52.7%
+  median ................ $79,893
+> grok x_search --window 60m
+  posts 37 · lean negative
+  crowd vs market .... divergent
+> `}
+        <span className="inline-block h-[1em] w-[0.6em] animate-pulse bg-text align-[-0.15em]" />
+      </pre>
+    </div>
   );
 }
 
@@ -135,7 +145,7 @@ export function AuthLayout({ title, subtitle, children }: { title: string; subti
       <section className="relative flex flex-col gap-10 overflow-hidden border-r border-line bg-night px-14 py-12">
         <Logo />
         <div className="relative flex max-w-[520px] flex-col gap-4">
-          <h1 className="m-0 font-display text-[44px] leading-[1.08] font-bold">See what the market thinks happens next.</h1>
+          <h1 className="m-0 font-display text-[52px] leading-[1.02] font-bold tracking-[-0.03em]">See what the market thinks happens next.</h1>
           <p className="m-0 text-lg leading-snug text-muted">
             Price distributions implied by Polymarket and Kalshi, the X posts that moved them, and a wallet to act on it.
           </p>
@@ -156,8 +166,7 @@ export function AuthLayout({ title, subtitle, children }: { title: string; subti
   );
 }
 
-const INPUT =
-  "h-12 rounded-xl border border-edge bg-panel px-3.5 text-base text-text outline-none focus:border-muted";
+const INPUT = "h-12 border border-edge bg-panel px-3.5 text-base text-text outline-none focus:border-muted";
 
 export function CredentialsForm({
   endpoint,
@@ -214,10 +223,10 @@ export function Page({ title, subtitle, children }: { title: string; subtitle: s
     <>
       <header className="flex items-end justify-between gap-6">
         <div className="flex flex-col gap-1.5">
-          <h1 className="m-0 font-display text-[28px] font-bold">{title}</h1>
+          <h1 className="m-0 font-display text-[34px] font-bold tracking-[-0.03em]">{title}</h1>
           <p className="m-0 text-[15px] text-muted">{subtitle}</p>
         </div>
-        <span className="flex h-8 shrink-0 items-center gap-2 rounded-2xl border border-edge px-3.5 text-[13px] text-muted">
+        <span className="flex h-8 shrink-0 items-center gap-2 border border-edge bg-ink px-3 font-mono text-[12px] text-muted">
           <span className="size-2 rounded-full bg-up" />
           Markets open · 24/7
         </span>

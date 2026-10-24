@@ -207,7 +207,7 @@ function EvidencePanel({
                       onChange={() =>
                         set({ postIds: checked ? selection.postIds.filter((x) => x !== p.post_id) : [...selection.postIds, p.post_id] })
                       }
-                      className="mt-0.5 accent-[#45e3ff]"
+                      className="mt-0.5 accent-[#f5f5f5]"
                     />
                     <span className="flex min-w-0 flex-col gap-1">
                       <span className="flex items-center gap-2 text-text">
@@ -246,7 +246,7 @@ function EvidencePanel({
               type="checkbox"
               checked={selection.reviewed}
               onChange={(e) => set({ reviewed: e.target.checked })}
-              className="mt-0.5 accent-[#ff4fa3]"
+              className="mt-0.5 accent-[#f5f5f5]"
             />
             I reviewed this evidence and I'm making this decision myself.
           </label>
@@ -386,7 +386,7 @@ function Ticket({
           value={q ? (buy ? tokenAmount(q.qty_out, token.symbol) : `${usd(q.qty_out)} USDC`) : "—"}
         />
         <DetailRow label="Price" value={priceEach === null ? "—" : `${usd(priceEach)} / ${token.symbol}`} />
-        <DetailRow label="Network fee" value="Covered by Tensho" />
+        <DetailRow label="Network fee" value="Covered by gateway" />
         {q && Number(q.fee) > 0 && <DetailRow label="Fee" value={`${tokenAmount(q.fee)} ${q.fee_asset}`} />}
         <p className="m-0 py-2.5 text-xs text-faint">
           {quote.data ? <QuoteAge preparedAt={quote.data.prepared_at} /> : quoteHint(quote.isFetching, quote.isError)}

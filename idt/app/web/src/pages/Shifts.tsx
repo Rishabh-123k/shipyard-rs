@@ -13,7 +13,7 @@ const WINDOWS = [
   { value: "72", label: "3 days" },
   { value: "168", label: "7 days" },
 ];
-const BEFORE = "#7d739b";
+const BEFORE = "#8a8a8a";
 
 const STATUS: Record<string, string> = {
   done: "posts retrieved",

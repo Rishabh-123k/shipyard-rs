@@ -69,7 +69,7 @@ export const VENUES: Record<string, { label: string; color: string; when: string
 };
 
 export function venueMeta(venue: string) {
-  return VENUES[venue] ?? { label: venue, color: "#a99fc7", when: "" };
+  return VENUES[venue] ?? { label: venue, color: "#a3a3a3", when: "" };
 }
 
 export function etDate(iso: string): string {

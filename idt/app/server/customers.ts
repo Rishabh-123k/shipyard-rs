@@ -14,6 +14,8 @@ export interface Customer {
   user_id: string | null;
   wallets: Wallet[];
   created_at: string;
+  // Bumped on password reset; sessions signed with an older version stop working.
+  session_version?: number;
 }
 
 interface CustomerFile {
@@ -90,6 +92,20 @@ export function setGatewayUser(id: string, user: { user_id: string; wallets: Wal
   if (!customer) throw new Error(`unknown customer ${id}`);
   customer.user_id = user.user_id;
   customer.wallets = user.wallets.map(({ chain_family, address }) => ({ chain_family, address }));
+  persist();
+  return customer;
+}
+
+export function sessionVersion(customer: Customer): number {
+  return customer.session_version ?? 0;
+}
+
+export function setPassword(id: string, password: string): Customer {
+  const customer = findById(id);
+  if (!customer) throw new Error(`unknown customer ${id}`);
+  const salt = randomBytes(16);
+  customer.password = { salt: salt.toString("hex"), hash: hashPassword(password, salt).toString("hex") };
+  customer.session_version = sessionVersion(customer) + 1;
   persist();
   return customer;
 }

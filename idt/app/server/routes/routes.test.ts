@@ -147,12 +147,21 @@ function fakeIdt() {
 }
 
 let idt: ReturnType<typeof fakeIdt>;
+let resetLinks: { email: string; link: string }[] = [];
 const OPEN_GUARD = { dryRun: false, maxOrderUsd: 1_000_000, maxTotalUsd: 1_000_000 };
 
 function freshApp(guard = OPEN_GUARD) {
   gateway = fakeGateway();
   idt = fakeIdt();
-  app = createApp({ gateway, assets: catalog, prices: priceBook, guard, idt });
+  resetLinks = [];
+  app = createApp({
+    gateway,
+    assets: catalog,
+    prices: priceBook,
+    guard,
+    idt,
+    notifyPasswordReset: (email, link) => resetLinks.push({ email, link }),
+  });
 }
 
 interface Prepared {
@@ -827,5 +836,71 @@ describe("trade guard", () => {
     gateway.getOrder.mockResolvedValueOnce({ order_id: "order-1", status: "complete", asset_id: PENGU.id } as unknown as OrderDetail);
     await get("/api/orders/order-1", cookie);
     expect(idt.updateTrade.mock.calls[1]).toEqual([trade_id, { status: "complete", error: undefined }]);
+  });
+});
+
+describe("password reset", () => {
+  beforeEach(freshApp);
+
+  const tokenOf = (link: string) => new URL(link).searchParams.get("token")!;
+
+  it("answers the same way for unknown and known emails, and only sends a link for a real account", async () => {
+    const { email } = await signUp();
+
+    const unknown = await post("/api/password/forgot", { email: "nobody@example.com" });
+    const known = await post("/api/password/forgot", { email: email.toUpperCase() });
+
+    expect(unknown.status).toBe(202);
+    expect(known.status).toBe(202);
+    expect(await unknown.json()).toEqual(await known.json());
+    expect(resetLinks).toHaveLength(1);
+    expect(resetLinks[0]!.email).toBe(email);
+    expect(resetLinks[0]!.link).toMatch(/\/reset-password\?token=/);
+  });
+
+  it("sets the new password, signs in, and revokes sessions from before the reset", async () => {
+    const { cookie: oldCookie, email } = await signUp();
+    await post("/api/password/forgot", { email });
+
+    const res = await post("/api/password/reset", { token: tokenOf(resetLinks[0]!.link), password: "brand-new-pass" });
+
+    expect(res.status).toBe(200);
+    expect((await get("/api/me", sessionCookie(res))).status).toBe(200);
+    expect((await get("/api/me", oldCookie)).status).toBe(401);
+    expect((await post("/api/login", { email, password: "password123" })).status).toBe(401);
+    expect((await post("/api/login", { email, password: "brand-new-pass" })).status).toBe(200);
+  });
+
+  it("accepts a reset link only once", async () => {
+    const { email } = await signUp();
+    await post("/api/password/forgot", { email });
+    const token = tokenOf(resetLinks[0]!.link);
+
+    await post("/api/password/reset", { token, password: "brand-new-pass" });
+    const again = await post("/api/password/reset", { token, password: "another-pass" });
+
+    expect(again.status).toBe(400);
+    expect(await again.json()).toMatchObject({ code: "reset_invalid" });
+  });
+
+  it("expires a reset link after 15 minutes", async () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    const { email } = await signUp();
+    await post("/api/password/forgot", { email });
+
+    vi.setSystemTime(Date.now() + 16 * 60_000);
+    const res = await post("/api/password/reset", { token: tokenOf(resetLinks[0]!.link), password: "brand-new-pass" });
+
+    expect(res.status).toBe(400);
+  });
+
+  it("doesn't reissue a link within 30 seconds, and rejects short passwords and made-up tokens", async () => {
+    const { email } = await signUp();
+    await post("/api/password/forgot", { email });
+    await post("/api/password/forgot", { email });
+    expect(resetLinks).toHaveLength(1);
+
+    expect((await post("/api/password/reset", { token: tokenOf(resetLinks[0]!.link), password: "short" })).status).toBe(400);
+    expect((await post("/api/password/reset", { token: "x".repeat(43), password: "brand-new-pass" })).status).toBe(400);
   });
 });

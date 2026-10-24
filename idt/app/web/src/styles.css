@@ -1,27 +1,29 @@
 @import "tailwindcss";
 
+/* Monochrome terminal look: near-black grid page, off-white type, square corners, mono UI chrome.
+   Data colors (venues, sentiment, up/down) stay saturated; they were validated on --color-panel. */
 @theme {
-  --color-ink: #0d0a17;
-  --color-night: #0a0813;
-  --color-panel: #171226;
-  --color-edge: #2a2240;
-  --color-line: #1f1933;
-  --color-text: #f4f0ff;
-  --color-muted: #a99fc7;
-  --color-faint: #7d739b;
-  --color-accent: #ff4fa3;
-  --color-cyan: #45e3ff;
+  --color-ink: #0d0d0d;
+  --color-night: #0a0a0a;
+  --color-panel: #111111;
+  --color-edge: #2e2e2e;
+  --color-line: #1f1f1f;
+  --color-text: #f5f5f5;
+  --color-muted: #a3a3a3;
+  --color-faint: #737373;
+  --color-accent: #f5f5f5;
+  --color-cyan: #e5e5e5;
   --color-up: #3ddc97;
   --color-down: #ff6b6b;
   --color-amber: #ffb547;
-  --color-violet: #b78cff;
-  --color-warn-bg: #1e1510;
-  --color-warn-edge: #5a3a1e;
+  --color-violet: #b3b3b3;
+  --color-warn-bg: #17130d;
+  --color-warn-edge: #4d3b1f;
   --color-warn-title: #ffd9a3;
-  --color-warn-text: #f4e3cf;
+  --color-warn-text: #efe6d8;
 
-  --font-display: "Unbounded", sans-serif;
-  --font-sans: "DM Sans", system-ui, sans-serif;
+  --font-display: "Oxanium", "Inter", system-ui, sans-serif;
+  --font-sans: "Inter", system-ui, sans-serif;
   --font-mono: "JetBrains Mono", ui-monospace, monospace;
 }
 
@@ -34,22 +36,52 @@
 
   body {
     margin: 0;
-    background: var(--color-ink);
     color: var(--color-text);
     font-family: var(--font-sans);
     -webkit-font-smoothing: antialiased;
+    background-color: var(--color-ink);
+    background-image:
+      linear-gradient(to right, rgb(245 245 245 / 0.07) 1px, transparent 1px),
+      linear-gradient(to bottom, rgb(245 245 245 / 0.07) 1px, transparent 1px),
+      linear-gradient(to right, rgb(245 245 245 / 0.025) 1px, transparent 1px),
+      linear-gradient(to bottom, rgb(245 245 245 / 0.025) 1px, transparent 1px);
+    background-size:
+      40px 40px,
+      40px 40px,
+      10px 10px,
+      10px 10px;
+    background-attachment: fixed;
+  }
+
+  /* Square corners everywhere; true dots keep rounded-full. Base-layer !important beats utility radii. */
+  *:not(.rounded-full) {
+    border-radius: 0 !important;
+  }
+
+  h1,
+  h2 {
+    font-family: var(--font-display);
+    letter-spacing: -0.02em;
   }
 
   a {
-    color: var(--color-cyan);
+    color: var(--color-text);
+    text-decoration-color: rgb(245 245 245 / 0.4);
+    text-underline-offset: 3px;
   }
 
   a:hover {
-    color: #8ceeff;
+    color: #ffffff;
+    text-decoration-color: #ffffff;
   }
 
   :focus-visible {
-    outline: 2px solid var(--color-cyan);
+    outline: 1px solid var(--color-text);
     outline-offset: 2px;
+  }
+
+  ::selection {
+    background: var(--color-text);
+    color: var(--color-ink);
   }
 }

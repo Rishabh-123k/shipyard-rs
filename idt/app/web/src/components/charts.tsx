@@ -1,7 +1,7 @@
 import { useLayoutEffect, useRef, useState, type MouseEvent, type ReactNode } from "react";
 import { compactPrice, pct, price, type Bucket, type CurvePoint } from "../idt.ts";
 
-const INK = { grid: "#2a2240", axis: "#7d739b", text: "#a99fc7", strong: "#f4f0ff", surface: "#171226" };
+const INK = { grid: "#262626", axis: "#737373", text: "#a3a3a3", strong: "#f5f5f5", surface: "#111111" };
 
 export interface CurveSeries {
   venue: string;

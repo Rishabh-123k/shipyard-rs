@@ -3,6 +3,7 @@ import { serveStatic } from "@hono/node-server/serve-static";
 import { Hono } from "hono";
 import type { AssetCatalog } from "./assets.ts";
 import type { IdtClient } from "./idt.ts";
+import type { ResetNotifier } from "./password-reset.ts";
 import { journalRoutes } from "./routes/journal.ts";
 import { ApiError, errorResponse } from "./http.ts";
 import type { PriceBook } from "./prices.ts";
@@ -25,6 +26,7 @@ export interface AppDeps {
   prices: PriceBook;
   guard: TradeGuard;
   idt: IdtClient;
+  notifyPasswordReset: ResetNotifier;
 }
 
 const DIST = "./dist";

@@ -2,7 +2,7 @@ import { randomBytes } from "node:crypto";
 import type { Context } from "hono";
 import { deleteCookie, getSignedCookie, setSignedCookie } from "hono/cookie";
 import { createMiddleware } from "hono/factory";
-import { findById, type Customer } from "./customers.ts";
+import { findById, sessionVersion, type Customer } from "./customers.ts";
 import { ApiError } from "./http.ts";
 import { persistentSecret } from "./secrets.ts";
 
@@ -15,8 +15,18 @@ export interface AppEnv {
   Variables: { customer: Customer };
 }
 
-export function setSession(c: Context, customerId: string): Promise<void> {
-  return setSignedCookie(c, COOKIE, customerId, SESSION_SECRET, COOKIE_OPTIONS);
+// The cookie carries "<customer id>.<session version>" so a password reset can revoke every older session.
+export function setSession(c: Context, customer: Customer): Promise<void> {
+  return setSignedCookie(c, COOKIE, `${customer.id}.${sessionVersion(customer)}`, SESSION_SECRET, COOKIE_OPTIONS);
+}
+
+function customerFromCookie(value: string | false | undefined): Customer | undefined {
+  if (!value) return undefined;
+  const dot = value.lastIndexOf(".");
+  // Cookies issued before versioning carry a bare id and count as version 0.
+  const [id, version] = dot === -1 ? [value, 0] : [value.slice(0, dot), Number(value.slice(dot + 1))];
+  const customer = findById(id);
+  return customer && sessionVersion(customer) === version ? customer : undefined;
 }
 
 export function clearSession(c: Context): void {
@@ -24,8 +34,7 @@ export function clearSession(c: Context): void {
 }
 
 export const requireCustomer = createMiddleware<AppEnv>(async (c, next) => {
-  const id = await getSignedCookie(c, SESSION_SECRET, COOKIE);
-  const customer = id ? findById(id) : undefined;
+  const customer = customerFromCookie(await getSignedCookie(c, SESSION_SECRET, COOKIE));
   if (!customer) throw new ApiError(401, "unauthenticated", "sign in");
   c.set("customer", customer);
   await next();

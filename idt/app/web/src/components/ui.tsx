@@ -6,11 +6,11 @@ import { percent } from "../format.ts";
 type Variant = "primary" | "secondary";
 
 const BUTTON_BASE =
-  "inline-flex h-12 items-center justify-center gap-2 rounded-[14px] px-[22px] text-[15px] font-bold no-underline transition-opacity disabled:cursor-not-allowed disabled:opacity-50";
+  "inline-flex h-12 items-center justify-center gap-2 border px-[22px] font-mono text-[14px] font-medium no-underline transition-colors disabled:cursor-not-allowed disabled:opacity-40";
 
 const BUTTON_VARIANT: Record<Variant, string> = {
-  primary: "bg-accent text-ink hover:text-ink hover:opacity-90",
-  secondary: "border border-edge bg-panel text-text hover:border-muted hover:text-text",
+  primary: "border-text bg-text text-ink hover:bg-white hover:text-ink",
+  secondary: "border-text bg-transparent text-text hover:bg-text hover:text-ink",
 };
 
 function buttonClass(variant: Variant = "primary", extra = ""): string {
@@ -55,7 +55,7 @@ export function Mono({ className = "", children }: { className?: string; childre
 }
 
 export function Label({ children }: { children: ReactNode }) {
-  return <span className="text-xs tracking-[0.12em] text-muted uppercase">{children}</span>;
+  return <span className="font-mono text-[11px] tracking-[0.08em] text-muted uppercase">{children}</span>;
 }
 
 export function Stat({ label, value, detail }: { label: string; value: ReactNode; detail?: ReactNode }) {
@@ -195,12 +195,12 @@ export function TxGlyph({ glyph, color }: { glyph: string; color: string }) {
 export function Logo() {
   return (
     <div className="flex items-center gap-2.5">
-      <div className="flex size-[34px] items-center justify-center rounded-[10px] bg-accent font-display text-sm font-bold text-ink">
-        I
+      <div className="flex size-[34px] items-center justify-center border border-text font-mono text-sm font-medium">
+        ID
       </div>
       <span className="flex flex-col leading-tight">
-        <span className="font-display text-[19px] font-bold">IDT</span>
-        <span className="text-[11px] text-faint">Implied Distribution Terminal</span>
+        <span className="font-display text-[20px] font-bold tracking-tight">idt</span>
+        <span className="font-mono text-[9px] whitespace-nowrap text-faint">implied distribution terminal</span>
       </span>
     </div>
   );
@@ -215,10 +215,10 @@ export function GridHorizon({ className = "" }: { className?: string }) {
         [129, 0.3],
         [160, 0.2],
       ].map(([y, opacity]) => (
-        <line key={y} x1="0" y1={y} x2="760" y2={y} stroke="#45E3FF" strokeWidth="1" opacity={opacity} />
+        <line key={y} x1="0" y1={y} x2="760" y2={y} stroke="#f5f5f5" strokeWidth="1" opacity={opacity} />
       ))}
       {rays.map((x) => (
-        <line key={x} x1="380" y1="105" x2={x} y2="190" stroke="#45E3FF" strokeWidth="1" opacity="0.2" />
+        <line key={x} x1="380" y1="105" x2={x} y2="190" stroke="#f5f5f5" strokeWidth="1" opacity="0.2" />
       ))}
     </svg>
   );
