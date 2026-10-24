@@ -366,3 +366,83 @@ export function BucketPanels({
     </div>
   );
 }
+
+export interface TimelinePoint {
+  id: string;
+  t: number;
+  value: number | null;
+  color: string;
+  label: string;
+  detail: string;
+}
+
+export function ShiftTimeline({
+  points,
+  domain,
+  selected,
+  onSelect,
+}: {
+  points: TimelinePoint[];
+  domain: [number, number];
+  selected: string | null;
+  onSelect: (id: string) => void;
+}) {
+  const [ref, width] = useWidth<HTMLDivElement>();
+  const [hover, setHover] = useState<TimelinePoint | null>(null);
+  const height = 180;
+  const m = { top: 14, right: 16, bottom: 28, left: 52 };
+  const plotW = Math.max(0, width - m.left - m.right);
+  const plotH = height - m.top - m.bottom;
+  const vmax = Math.max(0.05, ...points.map((p) => Math.abs(p.value ?? 0))) * 1.15;
+  const x = scale(domain[0], domain[1], m.left, m.left + plotW);
+  const y = scale(-vmax, vmax, m.top + plotH, m.top);
+  const yTicks = niceTicks(-vmax, vmax, 4);
+  const hours = (domain[1] - domain[0]) / 3_600_000;
+  const stepH = hours <= 30 ? 6 : hours <= 80 ? 12 : 24;
+  const xTicks: number[] = [];
+  const first = Math.ceil(domain[0] / (stepH * 3_600_000)) * stepH * 3_600_000;
+  for (let t = first; t <= domain[1]; t += stepH * 3_600_000) xTicks.push(t);
+  const fmt = (t: number) =>
+    new Date(t).toLocaleString("en-US", { hour: "numeric", ...(stepH >= 12 ? { month: "short", day: "numeric" } : {}), timeZone: "America/New_York" });
+
+  return (
+    <div ref={ref} className="relative w-full" style={{ height }}>
+      {width > 0 && (
+        <svg width={width} height={height} role="img" aria-label="Shift events over time; height is the change in probability of finishing above spot">
+          {yTicks.map((t) => (
+            <g key={t}>
+              <line x1={m.left} x2={m.left + plotW} y1={y(t)} y2={y(t)} stroke={INK.grid} opacity={t === 0 ? 1 : 0.5} />
+              <text x={m.left - 10} y={y(t)} dy="0.32em" textAnchor="end" fontSize={11} fill={INK.axis}>
+                {t === 0 ? "0" : `${t > 0 ? "+" : "−"}${Math.abs(t * 100).toFixed(0)}pp`}
+              </text>
+            </g>
+          ))}
+          {xTicks.map((t) => (
+            <text key={t} x={x(t)} y={height - 8} textAnchor="middle" fontSize={11} fill={INK.axis}>
+              {fmt(t)}
+            </text>
+          ))}
+          {points.map((p) => {
+            const cx = x(p.t);
+            const cy = y(p.value ?? 0);
+            const isSel = p.id === selected;
+            return (
+              <g key={p.id} className="cursor-pointer" onClick={() => onSelect(p.id)} onMouseEnter={() => setHover(p)} onMouseLeave={() => setHover(null)}>
+                <line x1={cx} x2={cx} y1={y(0)} y2={cy} stroke={p.color} strokeWidth={1} opacity={0.5} />
+                <circle cx={cx} cy={cy} r={isSel ? 6 : 4.5} fill={p.value === null ? INK.surface : p.color} stroke={isSel ? INK.strong : INK.surface} strokeWidth={2} />
+                {p.value === null && <circle cx={cx} cy={cy} r={3} fill="none" stroke={p.color} strokeWidth={1.5} />}
+                <circle cx={cx} cy={cy} r={10} fill="transparent" />
+              </g>
+            );
+          })}
+        </svg>
+      )}
+      {hover && (
+        <Tooltip x={x(hover.t)} y={y(hover.value ?? 0)} width={width}>
+          <span className="text-text">{hover.label}</span>
+          <span className="text-muted">{hover.detail}</span>
+        </Tooltip>
+      )}
+    </div>
+  );
+}

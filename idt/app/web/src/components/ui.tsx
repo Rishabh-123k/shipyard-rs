@@ -131,7 +131,7 @@ export function PriceChange({ ratio, className = "" }: { ratio: number | null; c
   return <Mono className={`${color} ${className}`}>{percent(ratio)}</Mono>;
 }
 
-export type SettlementState = "signing" | "pending" | "succeeded" | "failed" | "timed_out";
+export type SettlementState = "signing" | "pending" | "succeeded" | "failed" | "timed_out" | "dry_run";
 
 export function SettlementNotice({
   state,
@@ -153,6 +153,7 @@ export function SettlementNotice({
     succeeded: { tone: "border-up/40 bg-up/10", message: success },
     failed: { tone: "border-down/40 bg-down/10", message: failure || "It didn't go through. Nothing moved." },
     timed_out: { tone: "border-warn-edge bg-warn-bg", message: "Still pending after a minute. Check Activity for the final status." },
+    dry_run: { tone: "border-warn-edge bg-warn-bg", message: "Dry run: nothing was signed or sent. The trade and its evidence are in your journal." },
   }[state];
   const { tone, message } = outcome;
   return (

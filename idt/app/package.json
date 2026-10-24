@@ -8,7 +8,8 @@
   },
   "scripts": {
     "dev": "concurrently -n engine,server,web \"npm run engine\" \"tsx watch server/index.ts\" \"vite --config web/vite.config.ts\"",
-    "engine": "cd .. && .venv/bin/uvicorn idt.api:app --host 127.0.0.1 --port 8787",
+    "engine": "cd .. && .venv/bin/uvicorn idt.api:app --host 127.0.0.1 --port 8787 --reload --reload-dir idt",
+    "snapshots": "cd .. && .venv/bin/python scripts/snapshot_loop.py",
     "build": "vite build --config web/vite.config.ts",
     "start": "tsx server/index.ts",
     "typecheck": "tsc -p server && tsc -p web --noEmit",

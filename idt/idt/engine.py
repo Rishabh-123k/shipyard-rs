@@ -72,6 +72,12 @@ def spot(asset: str) -> dict:
     return _spot_cache.get(asset, get)
 
 
+def truemarkets_quote(asset: str, side: str, usd: float) -> dict:
+    q = _truemarkets().quote(asset, side, usd)
+    return {"asset": asset, "side": side, "usd": usd, "price": float(q["price"]), "qty": q.get("qty"),
+            "notional": q.get("notional"), "fee": q.get("fee"), "source": "True Markets compute_quote (CeFi)"}
+
+
 def contracts(asset: str) -> tuple[list[Contract], list[dict]]:
     def get():
         with httpx.Client(timeout=30) as client:

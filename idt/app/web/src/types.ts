@@ -71,6 +71,14 @@ export interface PreparedOrder {
   status: string;
   quote?: Quote;
   prepared_at: string;
+  simulated: { reason: string; source: string } | null;
+  confirm: {
+    token: string;
+    expires_at: string;
+    evidence_asset: string;
+    evidence_version: string | null;
+    usd_amount: number;
+  };
 }
 
 export interface OrderDetail {

@@ -27,6 +27,7 @@ class Contract:
     hi: float | None = None
     rules: str = ""
     title: str = ""
+    token_id: str | None = None
 
     @property
     def spread(self) -> float | None:

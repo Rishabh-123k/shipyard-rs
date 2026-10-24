@@ -126,3 +126,248 @@ export function price(v: number | null | undefined, asset: string): string {
 export function compactPrice(v: number): string {
   return v >= 10_000 ? `$${(v / 1000).toLocaleString("en-US", { maximumFractionDigits: 1 })}k` : `$${v.toLocaleString("en-US", { maximumFractionDigits: 0 })}`;
 }
+
+export interface ShiftRow {
+  event_id: string;
+  asset: IdtAsset;
+  venue: string;
+  resolution_at: string;
+  window_start: string;
+  window_end: string;
+  level: number;
+  d_median: number | null;
+  d_p_above_spot: number | null;
+  wasserstein: number | null;
+  reasons: string[];
+  xsearch_status: string;
+  source: string;
+  n_posts: number;
+  median_before: number | null;
+  median_after: number | null;
+  p_before: number | null;
+  p_after: number | null;
+}
+
+export interface StoredSnapshot {
+  snapshot_id: string;
+  venue: string;
+  resolution_at: string;
+  taken_at: string;
+  source: string;
+  points: CurvePoint[];
+  quantiles: QuantileValue[];
+}
+
+export interface XPostView {
+  post_id: string;
+  url: string;
+  author: string | null;
+  posted_at: string;
+  text: string | null;
+  text_source: string;
+  in_window: boolean;
+}
+
+export interface XRun {
+  run_id: string;
+  query_mode: string;
+  model: string;
+  grok_summary: string | null;
+  search_from: string;
+  search_to: string;
+  handles: string[] | null;
+  error: string | null;
+  n_citations: number;
+}
+
+export interface ShiftDetail {
+  event_id: string;
+  asset: IdtAsset;
+  venue: string;
+  resolution_at: string;
+  window_start: string;
+  window_end: string;
+  level: number;
+  reasons: string[];
+  xsearch_status: string;
+  before: StoredSnapshot;
+  after: StoredSnapshot;
+  posts: Record<string, XPostView[]>;
+  runs: XRun[];
+}
+
+export interface AskEvent {
+  ref: string;
+  event_id: string;
+  asset: string;
+  venue: string;
+  resolution_at: string;
+  window_start: string;
+  window_end: string;
+  prev_snapshot_id: string;
+  snapshot_id: string;
+  source: string;
+  level: number;
+  median_before: number | null;
+  median_after: number | null;
+  p_before: number | null;
+  p_after: number | null;
+}
+
+export interface AskState {
+  ref: string;
+  snapshot_id: string;
+  asset: string;
+  venue: string;
+  resolution_at: string;
+  taken_at: string;
+  quantiles: QuantileValue[];
+  p_above_spot: { level: number; prob: number } | null;
+}
+
+export interface AskPost {
+  ref: string;
+  post_id: string;
+  url: string;
+  author: string | null;
+  posted_at: string;
+  text: string | null;
+  in_window: boolean;
+  modes: string[];
+  sim: number;
+}
+
+export interface AskResponse {
+  question: string;
+  refused: boolean;
+  answer: string;
+  model?: string;
+  window: { start: string; end: string; label: string };
+  numbers: AskEvent[];
+  state: AskState[];
+  posts: AskPost[];
+  cited?: string[];
+  warnings: string[];
+  caveats: string[];
+}
+
+export function useShifts(asset: IdtAsset, hours: number) {
+  return useQuery({
+    queryKey: ["idt", "shifts", asset, hours],
+    queryFn: () => api<ShiftRow[]>(`/api/idt/shifts?asset=${asset}&hours=${hours}`),
+    refetchInterval: 60_000,
+    placeholderData: keepPreviousData,
+  });
+}
+
+export function useShift(eventId: string | null) {
+  return useQuery({
+    queryKey: ["idt", "shift", eventId],
+    queryFn: () => api<ShiftDetail>(`/api/idt/shifts/${encodeURIComponent(eventId!)}`),
+    enabled: eventId !== null,
+    refetchInterval: (q) => (q.state.data && ["queued", "running"].includes(q.state.data.xsearch_status) ? 10_000 : false),
+  });
+}
+
+export function etStamp(iso: string): string {
+  return new Date(iso).toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit", timeZone: "America/New_York" }) + " ET";
+}
+
+export const EVIDENCE_ASSET: Record<string, IdtAsset> = { CBBTC: "BTC", BTC: "BTC", WBTC: "BTC", ETH: "ETH", WETH: "ETH" };
+
+export interface EvidenceLadder {
+  snapshot_id: string;
+  venue: string;
+  resolution_at: string;
+  taken_at: string;
+  p_above_spot: { level: number; prob: number; clamped: string | null } | null;
+  median: number | null;
+  coherence_score: number;
+}
+
+export interface EvidencePost {
+  post_id: string;
+  url: string;
+  author: string | null;
+  posted_at: string;
+  text: string;
+  in_window: boolean;
+}
+
+export interface EvidenceEvent {
+  event_id: string;
+  venue: string;
+  resolution_at: string;
+  window_start: string;
+  window_end: string;
+  level: number;
+  reasons: string[];
+  source: string;
+  p_before: number | null;
+  p_after: number | null;
+  posts: EvidencePost[];
+}
+
+export interface Evidence {
+  asset: IdtAsset;
+  version: string | null;
+  taken_at: string | null;
+  age_seconds: number | null;
+  fresh_for_seconds: number;
+  refreshing: boolean;
+  ladders: EvidenceLadder[];
+  event: EvidenceEvent | null;
+}
+
+export function useEvidence(asset: IdtAsset | undefined) {
+  return useQuery({
+    queryKey: ["idt", "evidence", asset],
+    queryFn: () => api<Evidence>(`/api/idt/evidence?asset=${asset}`),
+    enabled: asset !== undefined,
+    refetchInterval: (q) => (q.state.data?.refreshing || !q.state.data?.version ? 4_000 : 15_000),
+    placeholderData: keepPreviousData,
+  });
+}
+
+export interface TradeGuardInfo {
+  dry_run: boolean;
+  max_order_usd: number;
+  max_total_usd: number;
+}
+
+export function useTradeGuard() {
+  return useQuery({ queryKey: ["trade-guard"], queryFn: () => api<TradeGuardInfo>("/api/trade-guard"), staleTime: Infinity });
+}
+
+export interface JournalEntry {
+  trade_id: string;
+  created_at: string;
+  asset: IdtAsset;
+  side: "buy" | "sell";
+  usd_amount: number;
+  quote: { base_asset?: string; qty_out?: string } | null;
+  order_id: string | null;
+  status: string;
+  dry_run: boolean;
+  rationale: string | null;
+  error: string | null;
+  snapshot_id: string;
+  venue: string;
+  resolution_at: string;
+  snapshot_taken_at: string;
+  event_id: string | null;
+  cited_post_ids: string[];
+  evidence: { version: string; ladders: EvidenceLadder[]; event: EvidenceEvent | null } | null;
+  thesis: {
+    level: number | null;
+    p_at_trade: number | null;
+    p_latest: number | null;
+    latest_snapshot_id: string | null;
+    latest_taken_at: string | null;
+    resolved: boolean;
+  };
+}
+
+export function useJournal() {
+  return useQuery({ queryKey: ["journal"], queryFn: () => api<JournalEntry[]>("/api/journal"), refetchInterval: 30_000 });
+}

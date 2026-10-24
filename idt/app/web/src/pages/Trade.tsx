@@ -1,6 +1,7 @@
-import { useState, type ReactNode } from "react";
+import { ExternalLink } from "lucide-react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { useSearchParams } from "react-router";
-import { isPriceMoved, useAssets, usePortfolio } from "../api.ts";
+import { ApiError, isPriceMoved, useAssets, usePortfolio } from "../api.ts";
 import { Page } from "../components/AppShell.tsx";
 import {
   AssetTile,
@@ -19,6 +20,20 @@ import {
 import { chainName, fractionOf, holdings, isPositiveDecimal, sanitizeDecimal, tokenAmount, toRatio, usd, type Holding } from "../format.ts";
 import { useDebounced, useNow, usePreparedFlow } from "../hooks.ts";
 import type { AssetRow, OrderDetail, PreparedOrder } from "../types.ts";
+import {
+  EVIDENCE_ASSET,
+  etDate,
+  etDateLabel,
+  etStamp,
+  etTime,
+  pct,
+  price,
+  useEvidence,
+  useTradeGuard,
+  venueMeta,
+  type Evidence,
+  type IdtAsset,
+} from "../idt.ts";
 
 type Side = "buy" | "sell";
 
@@ -72,21 +87,195 @@ function QuoteAge({ preparedAt }: { preparedAt: string }) {
   return <>Updated {Math.max(0, Math.round((now - Date.parse(preparedAt)) / 1000))}s ago · refreshes every 10s</>;
 }
 
+interface Selection {
+  ladderKey: string | null;
+  postIds: string[];
+  rationale: string;
+  reviewed: boolean;
+}
+
+const EMPTY_SELECTION: Selection = { ladderKey: null, postIds: [], rationale: "", reviewed: false };
+
+function ladderKey(l: { venue: string; resolution_at: string }): string {
+  return `${l.venue}|${l.resolution_at}`;
+}
+
+function ConfirmCountdown({ expiresAt, version }: { expiresAt: string; version: string | null }) {
+  const now = useNow(1000);
+  const left = Math.max(0, Math.round((Date.parse(expiresAt) - now) / 1000));
+  return (
+    <>
+      Confirmation valid {left}s · bound to snapshot run <span className="font-mono">{version?.slice(0, 8) ?? "none"}</span>
+    </>
+  );
+}
+
+function EvidencePanel({
+  asset,
+  evidence,
+  selection,
+  onChange,
+  loading,
+}: {
+  asset: IdtAsset;
+  evidence?: Evidence;
+  selection: Selection;
+  onChange: (next: Selection) => void;
+  loading: boolean;
+}) {
+  const ev = evidence?.event;
+  const age = evidence?.age_seconds;
+  const stale = age !== null && age !== undefined && age > (evidence?.fresh_for_seconds ?? 360);
+  const set = (patch: Partial<Selection>) => onChange({ ...selection, ...patch });
+
+  return (
+    <Card className="flex flex-col gap-5 p-[22px]">
+      <div className="flex flex-col gap-1">
+        <h2 className="m-0 text-[17px] font-bold">Evidence for this {asset} trade</h2>
+        <span className="text-xs text-faint">
+          {evidence?.taken_at ? (
+            <>
+              Snapshot {etStamp(evidence.taken_at)} · run <span className="font-mono">{evidence.version?.slice(0, 8)}</span>
+              {stale && <span className="text-amber"> · stale</span>}
+            </>
+          ) : (
+            "No stored snapshot yet"
+          )}
+          {evidence?.refreshing && " · taking a fresh snapshot…"}
+        </span>
+      </div>
+
+      {loading && !evidence && <Spinner label="Loading evidence from Snowflake" />}
+
+      {evidence && (
+        <div className="flex flex-col gap-2">
+          <Label>1 · The ladder your trade is about</Label>
+          <div role="radiogroup" aria-label="Thesis ladder" className="flex max-h-[260px] flex-col gap-1.5 overflow-y-auto">
+            {evidence.ladders.map((l) => {
+              const key = ladderKey(l);
+              const active = key === selection.ladderKey;
+              const v = venueMeta(l.venue);
+              return (
+                <button
+                  key={key}
+                  type="button"
+                  role="radio"
+                  aria-checked={active}
+                  onClick={() => set({ ladderKey: key })}
+                  className={`flex cursor-pointer items-center justify-between gap-3 rounded-xl border px-3 py-2 text-left text-[13px] ${
+                    active ? "border-muted bg-line text-text" : "border-edge bg-transparent text-muted hover:text-text"
+                  }`}
+                >
+                  <span className="flex items-center gap-2">
+                    <span className="size-2 rounded-full" style={{ background: v.color }} />
+                    {v.label} · {etDateLabel(etDate(l.resolution_at))} {etTime(l.resolution_at)}
+                  </span>
+                  <span className="font-mono text-xs">
+                    P(&gt;{price(l.p_above_spot?.level, asset)}) {pct(l.p_above_spot?.prob)} · med {price(l.median, asset)}
+                  </span>
+                </button>
+              );
+            })}
+            {evidence.ladders.length === 0 && <span className="text-sm text-muted">No ladders in the latest snapshot.</span>}
+          </div>
+        </div>
+      )}
+
+      {evidence && (
+        <div className="flex flex-col gap-2">
+          <Label>2 · Posts behind the latest shift (cite the ones you relied on)</Label>
+          {ev ? (
+            <>
+              <div className="rounded-xl border border-line px-3 py-2.5 text-[13px]">
+                <span className="text-text">
+                  {venueMeta(ev.venue).label} · {etDateLabel(etDate(ev.resolution_at))} ladder
+                </span>
+                <span className="block text-muted">
+                  {etStamp(ev.window_start)} → {etStamp(ev.window_end)} · P(&gt;{price(ev.level, asset)}) {pct(ev.p_before)} → {pct(ev.p_after)}
+                </span>
+                {ev.source === "backfill" && <span className="block text-xs text-amber">reconstructed from price history</span>}
+              </div>
+              {ev.posts.map((p) => {
+                const checked = selection.postIds.includes(p.post_id);
+                return (
+                  <label key={p.post_id} className="flex cursor-pointer gap-3 rounded-xl border border-line px-3 py-2.5 text-[13px]">
+                    <input
+                      type="checkbox"
+                      checked={checked}
+                      onChange={() =>
+                        set({ postIds: checked ? selection.postIds.filter((x) => x !== p.post_id) : [...selection.postIds, p.post_id] })
+                      }
+                      className="mt-0.5 accent-[#45e3ff]"
+                    />
+                    <span className="flex min-w-0 flex-col gap-1">
+                      <span className="flex items-center gap-2 text-text">
+                        @{p.author ?? "unknown"}
+                        <span className="text-xs text-faint">{etStamp(p.posted_at)}</span>
+                        <a href={p.url} target="_blank" rel="noreferrer" onClick={(e) => e.stopPropagation()} className="flex items-center text-xs">
+                          X <ExternalLink aria-hidden className="ml-0.5 size-3" />
+                        </a>
+                      </span>
+                      <span className="line-clamp-3 text-muted">“{p.text}”</span>
+                    </span>
+                  </label>
+                );
+              })}
+            </>
+          ) : (
+            <span className="text-sm text-muted">No shift in the last 24 hours, so there are no posts to cite.</span>
+          )}
+        </div>
+      )}
+
+      {evidence && (
+        <div className="flex flex-col gap-2">
+          <Label>3 · Your rationale (optional, saved to the journal)</Label>
+          <textarea
+            value={selection.rationale}
+            maxLength={1000}
+            rows={3}
+            onChange={(e) => set({ rationale: e.target.value })}
+            placeholder="e.g. Markets price 51% above spot for Oct 30 after the liquidation flush; I think that's too low."
+            className="resize-none rounded-xl border border-edge bg-ink px-3 py-2.5 text-sm text-text outline-none focus:border-muted"
+          />
+          <label className="flex cursor-pointer items-start gap-3 text-[13px] text-text">
+            <input
+              type="checkbox"
+              checked={selection.reviewed}
+              onChange={(e) => set({ reviewed: e.target.checked })}
+              className="mt-0.5 accent-[#ff4fa3]"
+            />
+            I reviewed this evidence and I'm making this decision myself.
+          </label>
+          <span className="text-xs text-faint">IDT never suggests or places trades on its own. Only your confirm click executes.</span>
+        </div>
+      )}
+    </Card>
+  );
+}
+
 function Ticket({
   token,
   side,
   onSide,
   position,
   cash,
+  evidence,
+  selection,
+  dryRun,
 }: {
   token: AssetRow;
   side: Side;
   onSide: (side: Side) => void;
   position?: Holding;
   cash?: Holding;
+  evidence?: Evidence;
+  selection: Selection;
+  dryRun: boolean;
 }) {
   const [amount, setAmount] = useState("");
   const settled = useDebounced(amount, 400);
+  const snapshot = evidence?.ladders.find((l) => ladderKey(l) === selection.ladderKey);
   const { quote, settlement, flow, executeError, canConfirm, confirm, reset, retry } = usePreparedFlow<"order_id", PreparedOrder, OrderDetail>({
     path: "/api/orders",
     idKey: "order_id",
@@ -95,7 +284,27 @@ function Ticket({
     terminal: ORDER_TERMINAL,
     success: "complete",
     refresh: true,
+    executeBody: (prepared) => ({
+      confirm_token: prepared.confirm.token,
+      evidence: {
+        version: prepared.confirm.evidence_version,
+        snapshot_id: snapshot?.snapshot_id,
+        event_id: evidence?.event?.event_id ?? null,
+        cited_post_ids: selection.postIds.filter((id) => evidence?.event?.posts.some((p) => p.post_id === id)),
+        rationale: selection.rationale.trim() || undefined,
+      },
+    }),
   });
+  const confirmInfo = quote.data?.confirm;
+  const evidenceMatches = !!confirmInfo?.evidence_version && confirmInfo.evidence_version === evidence?.version;
+  const blocker = !snapshot
+    ? "Pick the ladder your trade is about."
+    : !selection.reviewed
+      ? "Tick the review box in the evidence panel."
+      : quote.data && !evidenceMatches
+        ? "Evidence just refreshed. Waiting for a quote bound to it…"
+        : null;
+  const evidenceChanged = executeError instanceof ApiError && executeError.code === "evidence_changed";
   const status = settlement.data?.status;
 
   function done() {
@@ -178,16 +387,37 @@ function Ticket({
         {q && Number(q.fee) > 0 && <DetailRow label="Fee" value={`${tokenAmount(q.fee)} ${q.fee_asset}`} />}
         <p className="m-0 py-2.5 text-xs text-faint">
           {quote.data ? <QuoteAge preparedAt={quote.data.prepared_at} /> : quoteHint(quote.isFetching, quote.isError)}
+          {confirmInfo && (
+            <span className="block">
+              <ConfirmCountdown expiresAt={confirmInfo.expires_at} version={confirmInfo.evidence_version} />
+            </span>
+          )}
         </p>
       </div>
 
-      {quote.error && !executeError && <Banner tone="error">{quote.error.message}</Banner>}
-      {executeError && (
-        <Banner tone="error" title={isPriceMoved(executeError) ? "Price moved and nothing was traded." : undefined}>
-          {isPriceMoved(executeError) ? "Review the quote again." : executeError.message}{" "}
-          <TextButton onClick={retry}>{isPriceMoved(executeError) ? "Review again" : "Try again"}</TextButton>
+      {quote.data?.simulated && (
+        <Banner title="Simulated quote (dry run)">
+          True Markets can't fill this order from your wallet ({quote.data.simulated.reason}), so it's priced from{" "}
+          {quote.data.simulated.source}. Nothing can be signed from it.
         </Banner>
       )}
+      {quote.error && !executeError && <Banner tone="error">{quote.error.message}</Banner>}
+      {executeError && (
+        <Banner
+          tone="error"
+          title={
+            evidenceChanged
+              ? "New evidence landed. Nothing was traded."
+              : isPriceMoved(executeError)
+                ? "Price moved and nothing was traded."
+                : undefined
+          }
+        >
+          {evidenceChanged ? executeError.message : isPriceMoved(executeError) ? "Review the quote again." : executeError.message}{" "}
+          <TextButton onClick={retry}>{isPriceMoved(executeError) || evidenceChanged ? "Review again" : "Try again"}</TextButton>
+        </Banner>
+      )}
+      {!flow && blocker && <span className="text-center text-xs text-amber">{blocker}</span>}
 
       {flow ? (
         <SettlementNotice
@@ -204,10 +434,11 @@ function Ticket({
       ) : (
         <Button
           className="mt-auto h-[54px] rounded-2xl text-base"
-          disabled={!canConfirm || amount !== settled}
+          disabled={!canConfirm || amount !== settled || blocker !== null}
           onClick={confirm}
         >
           Confirm {side}
+          {dryRun ? " (dry run)" : ""}
         </Button>
       )}
     </Card>
@@ -245,14 +476,57 @@ export function Trade() {
     setParams({ asset: next.asset ?? token?.asset_id ?? "", side: next.side ?? side }, { replace: true });
   }
 
+  const evidenceAsset = token ? EVIDENCE_ASSET[token.symbol.toUpperCase()] : undefined;
+  const evidence = useEvidence(evidenceAsset);
+  const guard = useTradeGuard();
+  const [selection, setSelection] = useState<Selection>(EMPTY_SELECTION);
+  const ev = evidence.data;
+
+  useEffect(() => setSelection(EMPTY_SELECTION), [evidenceAsset]);
+
+  // Default thesis ladder: the nearest one that resolves more than two hours out.
+  const defaultKey = useMemo(() => {
+    const later = ev?.ladders.filter((l) => Date.parse(l.resolution_at) - Date.now() > 2 * 3_600_000) ?? [];
+    return (later[0] ?? ev?.ladders[0]) ? ladderKey((later[0] ?? ev!.ladders[0])!) : null;
+  }, [ev]);
+  const eventId = ev?.event?.event_id;
+  useEffect(() => {
+    setSelection((s) => ({ ...s, postIds: ev?.event?.posts.filter((p) => p.in_window).map((p) => p.post_id) ?? [] }));
+    // Re-default cited posts only when the event itself changes.
+  }, [eventId]);
+  const effective: Selection = {
+    ...selection,
+    ladderKey: selection.ladderKey && ev?.ladders.some((l) => ladderKey(l) === selection.ladderKey) ? selection.ladderKey : defaultKey,
+  };
+
   return (
-    <Page title="Trade" subtitle="Buy and sell tokens with your cash balance.">
+    <Page title="Trade" subtitle="Every order sits next to the evidence behind it, and lands in your journal with that evidence.">
+      {guard.data && (
+        <Banner title={guard.data.dry_run ? "Dry run: orders are journaled but never signed or sent" : "Live trading on mainnet"}>
+          Orders are capped at {usd(guard.data.max_order_usd)} each and {usd(guard.data.max_total_usd)} in total across live trades. A
+          confirmation expires after 60 seconds or as soon as a newer snapshot lands.
+        </Banner>
+      )}
       {assets.error && <Banner tone="error">{assets.error.message}</Banner>}
+      {evidence.error && <Banner tone="error" title="Evidence unavailable">{evidence.error.message}</Banner>}
       {!token ? (
         <Spinner />
       ) : (
-        <div className="grid flex-1 grid-cols-[1fr_1.25fr_0.9fr] items-start gap-5">
-          <TokenList tokens={tokens} selected={token.symbol} onSelect={(asset) => select({ asset })} />
+        <div className="grid flex-1 grid-cols-[0.8fr_1.05fr_1.25fr] items-start gap-5">
+          <div className="flex flex-col gap-4">
+            <TokenList tokens={tokens} selected={token.asset_id} onSelect={(asset) => select({ asset })} />
+            <Card className="flex flex-col gap-3 p-[18px]">
+              <Stat
+                label={`Your ${token.symbol}`}
+                value={tokenAmount(position?.total ?? "0", token.symbol)}
+                detail={usd(position?.value ?? (position ? null : 0))}
+              />
+              <div className="flex flex-col gap-1">
+                <Label>Cash available</Label>
+                <Mono className="text-lg">{usd(cash?.available ?? 0)}</Mono>
+              </div>
+            </Card>
+          </div>
           <Ticket
             key={`${token.asset_id}:${side}`}
             token={token}
@@ -260,22 +534,15 @@ export function Trade() {
             onSide={(s) => select({ side: s })}
             position={position}
             cash={cash}
+            evidence={ev}
+            selection={effective}
+            dryRun={guard.data?.dry_run ?? true}
           />
-          <Card className="flex flex-col gap-4 p-[22px]">
-            <h2 className="m-0 text-[17px] font-bold">Your {token.symbol}</h2>
-            <Stat
-              label="Balance"
-              value={tokenAmount(position?.total ?? "0", token.symbol)}
-              detail={usd(position?.value ?? (position ? null : 0))}
-            />
-            <div className="flex flex-col gap-1">
-              <Label>Cash available</Label>
-              <Mono className="text-[22px]">{usd(cash?.available ?? 0)}</Mono>
-            </div>
-            <p className="m-0 mt-6 text-[13px] leading-relaxed text-faint">
-              Prices move between quote and fill. If a trade can't land within your slippage, it's cancelled and nothing moves.
-            </p>
-          </Card>
+          {evidenceAsset ? (
+            <EvidencePanel asset={evidenceAsset} evidence={ev} selection={effective} onChange={setSelection} loading={evidence.isPending} />
+          ) : (
+            <Banner title="No evidence for this token">IDT only trades BTC and ETH, the assets with prediction-market ladders.</Banner>
+          )}
         </div>
       )}
     </Page>

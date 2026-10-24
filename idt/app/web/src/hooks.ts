@@ -39,6 +39,7 @@ function useLiveQuote<T>(path: string, body: Record<string, string>, enabled: bo
 }
 
 export function settlementState(input: {
+  dryRun?: boolean;
   signing: boolean;
   startedAt: number | null;
   status: string | undefined;
@@ -46,8 +47,9 @@ export function settlementState(input: {
   success: string;
   now: number;
 }): SettlementState | null {
-  const { signing, startedAt, status, terminal, success, now } = input;
+  const { dryRun, signing, startedAt, status, terminal, success, now } = input;
   if (signing) return "signing";
+  if (dryRun) return "dry_run";
   if (startedAt === null) return null;
   if (status !== undefined && terminal.includes(status)) return status === success ? "succeeded" : "failed";
   return now - startedAt > SETTLE_TIMEOUT_MS ? "timed_out" : "pending";
@@ -65,7 +67,7 @@ function useSettlement<T extends { status: string }>(path: string | null, termin
   });
 }
 
-interface PreparedFlowOptions<K extends string> {
+interface PreparedFlowOptions<K extends string, Prepared = unknown> {
   path: "/api/orders" | "/api/transfers";
   idKey: K;
   body: Record<string, string>;
@@ -74,6 +76,8 @@ interface PreparedFlowOptions<K extends string> {
   refresh: boolean;
   terminal: readonly string[];
   success: string;
+  // Extra fields the execute call must carry, built from the reviewed quote (e.g. a confirmation token).
+  executeBody?: (prepared: Prepared) => unknown;
 }
 
 export function usePreparedFlow<K extends string, Prepared extends Record<K, string>, Detail extends { status: string }>({
@@ -84,15 +88,24 @@ export function usePreparedFlow<K extends string, Prepared extends Record<K, str
   refresh,
   terminal,
   success,
-}: PreparedFlowOptions<K>) {
+  executeBody,
+}: PreparedFlowOptions<K, Prepared>) {
   const queryClient = useQueryClient();
   const [executed, setExecuted] = useState<{ id: string; startedAt: number } | null>(null);
+  const [dryRun, setDryRun] = useState<Record<string, string> | null>(null);
 
   const execute = useMutation({
-    mutationFn: (id: string) => api<Record<K, string>>(`${path}/${encodeURIComponent(id)}/execute`, { method: "POST" }),
-    onSuccess: (res) => setExecuted({ id: res[idKey], startedAt: Date.now() }),
+    mutationFn: (prepared: Prepared) =>
+      api<Record<string, string>>(`${path}/${encodeURIComponent(prepared[idKey])}/execute`, {
+        method: "POST",
+        body: executeBody?.(prepared),
+      }),
+    onSuccess: (res) => {
+      if (res.status === "dry_run") setDryRun(res);
+      else setExecuted({ id: res[idKey]!, startedAt: Date.now() });
+    },
   });
-  const quote = useLiveQuote<Prepared>(path, body, ready && execute.isIdle && executed === null, refresh);
+  const quote = useLiveQuote<Prepared>(path, body, ready && execute.isIdle && executed === null && dryRun === null, refresh);
   const settlement = useSettlement<Detail>(
     executed && `${path}/${encodeURIComponent(executed.id)}`,
     terminal,
@@ -116,7 +129,9 @@ export function usePreparedFlow<K extends string, Prepared extends Record<K, str
   return {
     quote,
     settlement,
+    dryRun,
     flow: settlementState({
+      dryRun: dryRun !== null,
       signing: execute.isPending,
       startedAt: executed?.startedAt ?? null,
       status,
@@ -126,9 +141,10 @@ export function usePreparedFlow<K extends string, Prepared extends Record<K, str
     }),
     executeError: execute.error,
     canConfirm: quote.data !== undefined && !quote.isError && !quote.isFetching && execute.isIdle,
-    confirm: () => quote.data && execute.mutate(quote.data[idKey]),
+    confirm: () => quote.data && execute.mutate(quote.data),
     reset: () => {
       setExecuted(null);
+      setDryRun(null);
       execute.reset();
     },
     retry: () => {

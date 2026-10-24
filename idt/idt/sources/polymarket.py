@@ -71,6 +71,7 @@ def parse_event(event: dict, asset: str, now: datetime) -> tuple[list[Contract],
         # Gamma omits bestBid/bestAsk when that side of the book is empty.
         ask = mk.get("bestAsk")
         bid = mk.get("bestBid")
+        token_id = _yes_token(mk)
         contracts.append(Contract(
             venue=VENUE,
             market_id=str(mk.get("conditionId") or mk.get("id")),
@@ -84,8 +85,27 @@ def parse_event(event: dict, asset: str, now: datetime) -> tuple[list[Contract],
             strike=float(qm.group(2).replace(",", "")),
             rules=mk.get("description", ""),
             title=question,
+            token_id=token_id,
         ))
     return contracts, rejected
+
+
+def _yes_token(mk: dict) -> str | None:
+    try:
+        outcomes = json.loads(mk.get("outcomes") or "[]")
+        tokens = json.loads(mk.get("clobTokenIds") or "[]")
+        return tokens[outcomes.index("Yes")]
+    except (ValueError, IndexError, TypeError):
+        return None
+
+
+def price_history(token_id: str, start: int, end: int, bucket_seconds: int,
+                  client: httpx.Client) -> list[tuple[int, float]]:
+    """Polymarket prices-history: one price per bucket (trade-based, not a two-sided quote)."""
+    r = client.get("https://data-api.polymarket.com/v2/prices-history",
+                   params={"token_id": token_id, "start": start, "end": end, "bucket_seconds": bucket_seconds})
+    r.raise_for_status()
+    return [(int(p["timestamp"]), float(p["price"])) for p in r.json().get("data") or []]
 
 
 def fetch_contracts(asset: str, client: httpx.Client | None = None,

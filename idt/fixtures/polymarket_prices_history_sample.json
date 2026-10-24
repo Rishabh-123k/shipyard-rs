@@ -1,0 +1,130 @@
+{
+  "data": [
+    {
+      "timestamp": 1792774800,
+      "price": 0.7,
+      "resolution_seconds": 3600
+    },
+    {
+      "timestamp": 1792778400,
+      "price": 0.69,
+      "resolution_seconds": 3600
+    },
+    {
+      "timestamp": 1792782000,
+      "price": 0.655,
+      "resolution_seconds": 3600
+    },
+    {
+      "timestamp": 1792785600,
+      "price": 0.645,
+      "resolution_seconds": 3600
+    },
+    {
+      "timestamp": 1792789200,
+      "price": 0.675,
+      "resolution_seconds": 3600
+    },
+    {
+      "timestamp": 1792792800,
+      "price": 0.665,
+      "resolution_seconds": 3600
+    },
+    {
+      "timestamp": 1792796400,
+      "price": 0.595,
+      "resolution_seconds": 3600
+    },
+    {
+      "timestamp": 1792800000,
+      "price": 0.64,
+      "resolution_seconds": 3600
+    },
+    {
+      "timestamp": 1792803600,
+      "price": 0.58,
+      "resolution_seconds": 3600
+    },
+    {
+      "timestamp": 1792807200,
+      "price": 0.61,
+      "resolution_seconds": 3600
+    },
+    {
+      "timestamp": 1792810800,
+      "price": 0.62,
+      "resolution_seconds": 3600
+    },
+    {
+      "timestamp": 1792814400,
+      "price": 0.615,
+      "resolution_seconds": 3600
+    },
+    {
+      "timestamp": 1792818000,
+      "price": 0.615,
+      "resolution_seconds": 3600
+    },
+    {
+      "timestamp": 1792821600,
+      "price": 0.595,
+      "resolution_seconds": 3600
+    },
+    {
+      "timestamp": 1792825200,
+      "price": 0.605,
+      "resolution_seconds": 3600
+    },
+    {
+      "timestamp": 1792828800,
+      "price": 0.605,
+      "resolution_seconds": 3600
+    },
+    {
+      "timestamp": 1792832400,
+      "price": 0.59,
+      "resolution_seconds": 3600
+    },
+    {
+      "timestamp": 1792836000,
+      "price": 0.58,
+      "resolution_seconds": 3600
+    },
+    {
+      "timestamp": 1792839600,
+      "price": 0.59,
+      "resolution_seconds": 3600
+    },
+    {
+      "timestamp": 1792843200,
+      "price": 0.585,
+      "resolution_seconds": 3600
+    },
+    {
+      "timestamp": 1792846800,
+      "price": 0.61,
+      "resolution_seconds": 3600
+    },
+    {
+      "timestamp": 1792850400,
+      "price": 0.595,
+      "resolution_seconds": 3600
+    },
+    {
+      "timestamp": 1792854000,
+      "price": 0.525,
+      "resolution_seconds": 3600
+    },
+    {
+      "timestamp": 1792859965,
+      "price": 0.465,
+      "resolution_seconds": 0
+    }
+  ],
+  "pagination": {
+    "limit": 10000,
+    "offset": 0,
+    "has_more": false,
+    "next_cursor": null
+  }
+}

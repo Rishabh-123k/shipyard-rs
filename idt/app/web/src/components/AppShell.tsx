@@ -1,5 +1,5 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { Activity, ArrowLeftRight, ChartSpline, LogOut, Plus, Send, Wallet, type LucideIcon } from "lucide-react";
+import { Activity, ArrowLeftRight, ChartSpline, History, LogOut, MessageSquareText, NotebookPen, Plus, Send, Wallet, type LucideIcon } from "lucide-react";
 import type { FormEvent, ReactNode } from "react";
 import { Navigate, NavLink, Outlet, useNavigate } from "react-router";
 import { api, ApiError, useMe } from "../api.ts";
@@ -8,8 +8,11 @@ import { Banner, Button, Logo, Spinner } from "./ui.tsx";
 
 const NAV: { to: string; label: string; icon: LucideIcon }[] = [
   { to: "/", label: "Markets", icon: ChartSpline },
+  { to: "/shifts", label: "Shifts", icon: History },
+  { to: "/ask", label: "Ask", icon: MessageSquareText },
   { to: "/wallet", label: "Wallet", icon: Wallet },
   { to: "/trade", label: "Trade", icon: ArrowLeftRight },
+  { to: "/journal", label: "Journal", icon: NotebookPen },
   { to: "/add-funds", label: "Add funds", icon: Plus },
   { to: "/send", label: "Send", icon: Send },
   { to: "/activity", label: "Activity", icon: Activity },

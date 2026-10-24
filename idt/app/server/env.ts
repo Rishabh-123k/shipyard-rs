@@ -25,6 +25,7 @@ const schema = z.object({
     .default("true")
     .transform((v) => v.toLowerCase() !== "false"),
   MAX_ORDER_USD: z.coerce.number().positive().default(10),
+  MAX_TOTAL_USD: z.coerce.number().positive().default(50),
 });
 
 type Env = z.infer<typeof schema>;

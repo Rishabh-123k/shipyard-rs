@@ -109,6 +109,32 @@ def fetch_contracts(asset: str, client: httpx.Client | None = None, now: datetim
     return contracts, rejected
 
 
+def candles(series: str, ticker: str, start: int, end: int, period_minutes: int,
+            client: httpx.Client) -> list[tuple[int, float | None, float | None]]:
+    """(period end ts, yes bid close, yes ask close) per candle."""
+    r = _get_with_backoff(client, f"{KALSHI_BASE}/series/{series}/markets/{ticker}/candlesticks",
+                          {"start_ts": start, "end_ts": end, "period_interval": period_minutes})
+    out = []
+    for c in r.json().get("candlesticks") or []:
+        bid = _f((c.get("yes_bid") or {}).get("close_dollars"))
+        ask = _f((c.get("yes_ask") or {}).get("close_dollars"))
+        out.append((int(c["end_period_ts"]), bid, ask))
+    return out
+
+
+def _get_with_backoff(client: httpx.Client, url: str, params: dict, attempts: int = 6) -> httpx.Response:
+    """Public Kalshi endpoints rate-limit bursts with 429; back off exponentially."""
+    import time
+    for i in range(attempts):
+        r = client.get(url, params=params)
+        if r.status_code != 429:
+            r.raise_for_status()
+            return r
+        time.sleep(float(r.headers.get("Retry-After") or 0.5 * 2 ** i))
+    r.raise_for_status()
+    return r
+
+
 def _relabel(c: Contract) -> Contract:
     from dataclasses import replace
     return replace(c, venue=f"{VENUE}-range")

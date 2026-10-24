@@ -7,7 +7,10 @@ import { AppShell } from "./components/AppShell.tsx";
 import { Activity } from "./pages/Activity.tsx";
 import { AddFunds } from "./pages/AddFunds.tsx";
 import { Home } from "./pages/Home.tsx";
+import { Journal } from "./pages/Journal.tsx";
+import { Ask } from "./pages/Ask.tsx";
 import { Markets } from "./pages/Markets.tsx";
+import { Shifts } from "./pages/Shifts.tsx";
 import { Send } from "./pages/Send.tsx";
 import { SignIn } from "./pages/SignIn.tsx";
 import { SignUp } from "./pages/SignUp.tsx";
@@ -33,6 +36,9 @@ createRoot(document.getElementById("root")!).render(
           <Route path="/login" element={<SignIn />} />
           <Route element={<AppShell />}>
             <Route index element={<Markets />} />
+            <Route path="/shifts" element={<Shifts />} />
+            <Route path="/ask" element={<Ask />} />
+            <Route path="/journal" element={<Journal />} />
             <Route path="/wallet" element={<Home />} />
             <Route path="/trade" element={<Trade />} />
             <Route path="/add-funds" element={<AddFunds />} />

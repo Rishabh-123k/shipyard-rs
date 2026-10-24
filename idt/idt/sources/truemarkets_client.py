@@ -27,6 +27,18 @@ _atr.AccessTokensResponse.from_dict = classmethod(_from_dict)
 _REAUTH_AFTER_S = 30 * 60
 
 
+SPOT_HISTORY_SYMBOL = {"BTC": "CBBTC", "ETH": "ETH"}
+
+
+def spot_history(asset: str, window: str = "24h", resolution: str = "5m") -> list[tuple[datetime, float]]:
+    """Public True Markets DeFi price history. BTC uses cbBTC, the BTC token tradeable on True Markets."""
+    import httpx
+    r = httpx.get("https://api.truemarkets.co/v1/defi/market/prices/history",
+                  params={"symbol": SPOT_HISTORY_SYMBOL[asset], "window": window, "resolution": resolution}, timeout=30)
+    r.raise_for_status()
+    return [(datetime.fromisoformat(p["t"].replace("Z", "+00:00")), float(p["price"])) for p in r.json()["points"]]
+
+
 def to_dict(obj: Any) -> Any:
     return obj.to_dict() if hasattr(obj, "to_dict") else obj
 

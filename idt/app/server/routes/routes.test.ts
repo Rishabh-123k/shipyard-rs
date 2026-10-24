@@ -6,6 +6,7 @@ import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vite
 import type { AssetCatalog } from "../assets.ts";
 import type { PriceBook, PriceQuote } from "../prices.ts";
 import { TMError } from "../tm/errors.ts";
+import type { IdtClient } from "../idt.ts";
 import type * as gatewayModule from "../tm/gateway.ts";
 import { signerPublicKeyCompressedHex } from "../tm/stamp.ts";
 import { assetItem, verifiesStamp } from "../testing.ts";
@@ -127,9 +128,49 @@ beforeAll(async () => {
   ({ createApp } = await import("../app.ts"));
 });
 
-function freshApp(guard = { dryRun: false, maxOrderUsd: 1_000_000 }) {
+function fakeIdt() {
+  return {
+    assetFor: vi.fn<IdtClient["assetFor"]>(() => "BTC"),
+    evidenceVersion: vi.fn<IdtClient["evidenceVersion"]>(async () => "v1"),
+    recordTrade: vi.fn<IdtClient["recordTrade"]>(async () => undefined),
+    updateTrade: vi.fn<IdtClient["updateTrade"]>(async () => undefined),
+    liveTotalUsd: vi.fn<IdtClient["liveTotalUsd"]>(async () => 0),
+    journal: vi.fn<IdtClient["journal"]>(async () => []),
+    cefiQuote: vi.fn<IdtClient["cefiQuote"]>(async () => ({
+      price: 80_000,
+      qty: "0.00006",
+      notional: "4.8",
+      fee: "0.002",
+      source: "True Markets compute_quote (CeFi)",
+    })),
+  } satisfies IdtClient;
+}
+
+let idt: ReturnType<typeof fakeIdt>;
+const OPEN_GUARD = { dryRun: false, maxOrderUsd: 1_000_000, maxTotalUsd: 1_000_000 };
+
+function freshApp(guard = OPEN_GUARD) {
   gateway = fakeGateway();
-  app = createApp({ gateway, assets: catalog, prices: priceBook, guard });
+  idt = fakeIdt();
+  app = createApp({ gateway, assets: catalog, prices: priceBook, guard, idt });
+}
+
+interface Prepared {
+  order_id: string;
+  confirm: { token: string; evidence_version: string | null };
+}
+
+async function prepareOrder(cookie: string, body: unknown = ORDER): Promise<Prepared> {
+  const res = await post("/api/orders", body, cookie);
+  expect(res.status).toBe(200);
+  return (await res.json()) as Prepared;
+}
+
+function confirmed(prepared: Prepared, evidence: Record<string, unknown> = {}) {
+  return {
+    confirm_token: prepared.confirm.token,
+    evidence: { version: "v1", snapshot_id: "snap-1", event_id: "evt-1", cited_post_ids: ["post-1"], rationale: "test", ...evidence },
+  };
 }
 
 afterEach(() => {
@@ -392,12 +433,12 @@ describe("order routes", () => {
   });
 
   it("executes a fresh quote with index-aligned stamps of the cached payloads", async () => {
-    await post("/api/orders", ORDER, cookie);
+    const prepared = await prepareOrder(cookie);
 
-    const res = await post("/api/orders/order-1/execute", {}, cookie);
+    const res = await post("/api/orders/order-1/execute", confirmed(prepared), cookie);
 
     expect(res.status).toBe(200);
-    expect(await res.json()).toEqual({ order_id: "order-1", status: "pending" });
+    expect(await res.json()).toEqual({ order_id: "order-1", status: "pending", trade_id: expect.any(String) });
     expect(gateway.createOrder).toHaveBeenCalledTimes(1);
     const [, orderId, signatures] = gateway.executeOrder.mock.calls[0]!;
     expect(orderId).toBe("order-1");
@@ -408,13 +449,13 @@ describe("order routes", () => {
 
   it("re-prepares a quote older than 20 seconds and executes the new order", async () => {
     vi.useFakeTimers({ toFake: ["Date"] });
-    await post("/api/orders", ORDER, cookie);
+    const prepared = await prepareOrder(cookie);
     gateway.createOrder.mockResolvedValueOnce(preparedOrder("order-2"));
 
     vi.setSystemTime(Date.now() + 21_000);
-    const res = await post("/api/orders/order-1/execute", {}, cookie);
+    const res = await post("/api/orders/order-1/execute", confirmed(prepared), cookie);
 
-    expect(await res.json()).toEqual({ order_id: "order-2", status: "pending" });
+    expect(await res.json()).toEqual({ order_id: "order-2", status: "pending", trade_id: expect.any(String) });
     expect(gateway.createOrder).toHaveBeenCalledTimes(2);
     expect(gateway.createOrder.mock.calls[1]).toEqual(gateway.createOrder.mock.calls[0]);
     const [, orderId, signatures] = gateway.executeOrder.mock.calls[0]!;
@@ -424,13 +465,13 @@ describe("order routes", () => {
 
   it("refuses a stale quote whose fresh prepare carries issues, signing nothing", async () => {
     vi.useFakeTimers({ toFake: ["Date"] });
-    await post("/api/orders", ORDER, cookie);
+    const prepared = await prepareOrder(cookie);
     const withIssue = preparedOrder("order-2");
     withIssue.quote!.issues = ["insufficient balance"];
     gateway.createOrder.mockResolvedValueOnce(withIssue);
 
     vi.setSystemTime(Date.now() + 21_000);
-    const res = await post("/api/orders/order-1/execute", {}, cookie);
+    const res = await post("/api/orders/order-1/execute", confirmed(prepared), cookie);
 
     expect(res.status).toBe(422);
     expect(gateway.executeOrder).not.toHaveBeenCalled();
@@ -480,10 +521,10 @@ describe("order routes", () => {
   });
 
   it("answers a second execute of the same quote with 409", async () => {
-    await post("/api/orders", ORDER, cookie);
-    await post("/api/orders/order-1/execute", {}, cookie);
+    const prepared = await prepareOrder(cookie);
+    await post("/api/orders/order-1/execute", confirmed(prepared), cookie);
 
-    const res = await post("/api/orders/order-1/execute", {}, cookie);
+    const res = await post("/api/orders/order-1/execute", confirmed(prepared), cookie);
 
     expect(res.status).toBe(409);
     expect(await res.json()).toEqual({ type: "failed_precondition", code: "quote_stale", message: "quote expired, review again" });
@@ -492,9 +533,9 @@ describe("order routes", () => {
 
   it("never executes a quote prepared for another customer", async () => {
     const other = await signUp();
-    await post("/api/orders", ORDER, cookie);
+    const prepared = await prepareOrder(cookie);
 
-    const res = await post("/api/orders/order-1/execute", {}, other.cookie);
+    const res = await post("/api/orders/order-1/execute", confirmed(prepared), other.cookie);
 
     expect(res.status).toBe(409);
     expect(gateway.executeOrder).not.toHaveBeenCalled();
@@ -503,12 +544,13 @@ describe("order routes", () => {
   it("relays a True Markets error with its status and bytes unchanged", async () => {
     const raw = '{"type":"failed_precondition","code":"quote_stale","message":"quote expired before it landed","request_id":"req-1"}';
     gateway.executeOrder.mockRejectedValueOnce(new TMError(422, JSON.parse(raw), raw));
-    await post("/api/orders", ORDER, cookie);
+    const prepared = await prepareOrder(cookie);
 
-    const res = await post("/api/orders/order-1/execute", {}, cookie);
+    const res = await post("/api/orders/order-1/execute", confirmed(prepared), cookie);
 
     expect(res.status).toBe(422);
     expect(await res.text()).toBe(raw);
+    expect(idt.updateTrade.mock.calls[0]![1]).toMatchObject({ status: "failed" });
   });
 
   it("rejects an amount that is not a positive decimal", async () => {
@@ -591,20 +633,31 @@ describe("transfer routes", () => {
 describe("trade guard", () => {
   let cookie: string;
 
-  async function withGuard(guard: { dryRun: boolean; maxOrderUsd: number }) {
-    freshApp(guard);
+  async function withGuard(guard: Partial<typeof OPEN_GUARD>) {
+    freshApp({ ...OPEN_GUARD, ...guard });
     ({ cookie } = await signUp());
   }
 
-  it("quotes but never signs or executes an order under DRY_RUN", async () => {
+  it("journals a dry run without signing or executing anything", async () => {
     await withGuard({ dryRun: true, maxOrderUsd: 10 });
-    expect((await post("/api/orders", ORDER, cookie)).status).toBe(200);
+    const prepared = await prepareOrder(cookie);
 
-    const res = await post("/api/orders/order-1/execute", {}, cookie);
+    const res = await post("/api/orders/order-1/execute", confirmed(prepared), cookie);
 
-    expect(res.status).toBe(403);
-    expect(await res.json()).toMatchObject({ code: "dry_run" });
+    expect(res.status).toBe(200);
+    expect(await res.json()).toMatchObject({ order_id: "order-1", status: "dry_run" });
     expect(gateway.executeOrder).not.toHaveBeenCalled();
+    expect(idt.recordTrade.mock.calls[0]![0]).toMatchObject({
+      status: "dry_run",
+      dry_run: true,
+      asset: "BTC",
+      side: "buy",
+      usd_amount: 1.2,
+      version: "v1",
+      snapshot_id: "snap-1",
+      event_id: "evt-1",
+      cited_post_ids: ["post-1"],
+    });
   });
 
   it("never executes a send under DRY_RUN", async () => {
@@ -618,7 +671,7 @@ describe("trade guard", () => {
   });
 
   it("rejects a buy over the cap before creating anything upstream", async () => {
-    await withGuard({ dryRun: false, maxOrderUsd: 1 });
+    await withGuard({ maxOrderUsd: 1 });
 
     const res = await post("/api/orders", ORDER, cookie);
 
@@ -628,7 +681,7 @@ describe("trade guard", () => {
   });
 
   it("rejects a sell whose quoted proceeds exceed the cap and caches nothing", async () => {
-    await withGuard({ dryRun: false, maxOrderUsd: 10 });
+    await withGuard({ maxOrderUsd: 10 });
 
     const res = await post("/api/orders", { ...ORDER, side: "sell", amount: "40.1" }, cookie);
     const execute = await post("/api/orders/order-1/execute", {}, cookie);
@@ -639,10 +692,140 @@ describe("trade guard", () => {
     expect(gateway.executeOrder).not.toHaveBeenCalled();
   });
 
-  it("allows an order inside the cap", async () => {
-    await withGuard({ dryRun: false, maxOrderUsd: 10 });
-    await post("/api/orders", ORDER, cookie);
+  it("in DRY_RUN, prices an order the wallet can't fill from a CeFi quote, labeled simulated", async () => {
+    await withGuard({ dryRun: true, maxOrderUsd: 10 });
+    const unfillable = preparedOrder("order-x");
+    unfillable.quote!.issues = ["Insufficient balance"];
+    gateway.createOrder.mockResolvedValueOnce(unfillable);
 
-    expect((await post("/api/orders/order-1/execute", {}, cookie)).status).toBe(200);
+    const res = await post("/api/orders", ORDER, cookie);
+    const body = (await res.json()) as Prepared & { simulated: { reason: string }; quote: { qty_out: string } };
+
+    expect(res.status).toBe(200);
+    expect(body.order_id).toMatch(/^dryrun-/);
+    expect(body.simulated.reason).toBe("Insufficient balance");
+    expect(body.quote.qty_out).toBe((1.2 / 80_000).toFixed(8));
+
+    const execute = await post(`/api/orders/${body.order_id}/execute`, confirmed(body), cookie);
+    expect(await execute.json()).toMatchObject({ status: "dry_run" });
+    expect(idt.recordTrade.mock.calls[0]![0]).toMatchObject({ dry_run: true, usd_amount: 1.2 });
+    expect(gateway.executeOrder).not.toHaveBeenCalled();
+  });
+
+  it("never simulates outside DRY_RUN: an unfillable order is refused with the venue's reason", async () => {
+    await withGuard({ dryRun: false });
+    const unfillable = preparedOrder("order-x");
+    unfillable.quote!.issues = ["Insufficient balance"];
+    gateway.createOrder.mockResolvedValueOnce(unfillable);
+
+    const res = await post("/api/orders", ORDER, cookie);
+
+    expect(res.status).toBe(422);
+    expect(idt.cefiQuote).not.toHaveBeenCalled();
+  });
+
+  it("refuses tokens with no implied distribution before quoting", async () => {
+    await withGuard({});
+    idt.assetFor.mockReturnValue(undefined);
+
+    const res = await post("/api/orders", ORDER, cookie);
+
+    expect(res.status).toBe(400);
+    expect(gateway.createOrder).not.toHaveBeenCalled();
+  });
+
+  it("issues a confirmation bound to the current evidence version", async () => {
+    await withGuard({});
+    const prepared = await prepareOrder(cookie);
+
+    expect(prepared.confirm.token).toMatch(/^[0-9a-f]{32}$/);
+    expect(prepared.confirm.evidence_version).toBe("v1");
+  });
+
+  it("rejects a confirmation token that doesn't match the quote", async () => {
+    await withGuard({});
+    const prepared = await prepareOrder(cookie);
+
+    const res = await post("/api/orders/order-1/execute", { ...confirmed(prepared), confirm_token: "nope" }, cookie);
+
+    expect(res.status).toBe(403);
+    expect(gateway.executeOrder).not.toHaveBeenCalled();
+  });
+
+  it("expires a confirmation after 60 seconds", async () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    await withGuard({});
+    const prepared = await prepareOrder(cookie);
+
+    vi.setSystemTime(Date.now() + 61_000);
+    const res = await post("/api/orders/order-1/execute", confirmed(prepared), cookie);
+
+    expect(res.status).toBe(409);
+    expect(await res.json()).toMatchObject({ code: "quote_stale" });
+    expect(idt.recordTrade).not.toHaveBeenCalled();
+    expect(gateway.executeOrder).not.toHaveBeenCalled();
+  });
+
+  it("voids the confirmation when a new snapshot lands before execute", async () => {
+    await withGuard({});
+    const prepared = await prepareOrder(cookie);
+    idt.evidenceVersion.mockResolvedValue("v2");
+
+    const res = await post("/api/orders/order-1/execute", confirmed(prepared), cookie);
+
+    expect(res.status).toBe(409);
+    expect(await res.json()).toMatchObject({ code: "evidence_changed" });
+    expect(idt.recordTrade).not.toHaveBeenCalled();
+    expect(gateway.executeOrder).not.toHaveBeenCalled();
+  });
+
+  it("rejects evidence from a different version than the one confirmed", async () => {
+    await withGuard({});
+    const prepared = await prepareOrder(cookie);
+
+    const res = await post("/api/orders/order-1/execute", confirmed(prepared, { version: "v0" }), cookie);
+
+    expect(res.status).toBe(409);
+    expect(gateway.executeOrder).not.toHaveBeenCalled();
+  });
+
+  it("enforces the cumulative cap across live trades", async () => {
+    await withGuard({ maxTotalUsd: 50 });
+    idt.liveTotalUsd.mockResolvedValue(49.5);
+    const prepared = await prepareOrder(cookie);
+
+    const res = await post("/api/orders/order-1/execute", confirmed(prepared), cookie);
+
+    expect(res.status).toBe(400);
+    expect(await res.json()).toMatchObject({ code: "over_total_cap" });
+    expect(idt.recordTrade).not.toHaveBeenCalled();
+    expect(gateway.executeOrder).not.toHaveBeenCalled();
+  });
+
+  it("journals before signing and signs nothing if the journal is down", async () => {
+    await withGuard({});
+    idt.recordTrade.mockRejectedValueOnce(new Error("snowflake down"));
+    const prepared = await prepareOrder(cookie);
+
+    const res = await post("/api/orders/order-1/execute", confirmed(prepared), cookie);
+
+    expect(res.status).toBe(500);
+    expect(gateway.executeOrder).not.toHaveBeenCalled();
+  });
+
+  it("journals a live trade as executing, then records the venue status and final settlement", async () => {
+    await withGuard({ maxOrderUsd: 10 });
+    const prepared = await prepareOrder(cookie);
+
+    const res = await post("/api/orders/order-1/execute", confirmed(prepared), cookie);
+    const { trade_id } = (await res.json()) as { trade_id: string };
+
+    expect(idt.recordTrade.mock.calls[0]![0]).toMatchObject({ trade_id, status: "executing", dry_run: false });
+    expect(idt.recordTrade.mock.invocationCallOrder[0]!).toBeLessThan(gateway.executeOrder.mock.invocationCallOrder[0]!);
+    expect(idt.updateTrade.mock.calls[0]).toEqual([trade_id, { status: "pending", order_id: "order-1" }]);
+
+    gateway.getOrder.mockResolvedValueOnce({ order_id: "order-1", status: "complete", asset_id: PENGU.id } as unknown as OrderDetail);
+    await get("/api/orders/order-1", cookie);
+    expect(idt.updateTrade.mock.calls[1]).toEqual([trade_id, { status: "complete", error: undefined }]);
   });
 });
