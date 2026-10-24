@@ -77,7 +77,7 @@ export function AppShell() {
   if (me.error) {
     return (
       <div className="mx-auto max-w-lg p-12">
-        <Banner tone="error" title="IDT is unreachable">
+        <Banner tone="error" title="cryptoshi is unreachable">
           {me.error.message}
         </Banner>
       </div>
@@ -121,7 +121,7 @@ function BrandArt() {
   return (
     <div aria-hidden className="pointer-events-none relative mt-auto w-full max-w-[520px] border border-text bg-ink p-3">
       <div className="flex items-center justify-between border-b border-edge pb-2 font-mono text-[11px] text-faint">
-        <span>idt — terminal</span>
+        <span>cryptoshi — terminal</span>
         <span>● ● ●</span>
       </div>
       <pre className="m-0 pt-3 font-mono text-[12px] leading-relaxed text-muted">
@@ -159,7 +159,7 @@ export function AuthLayout({ title, subtitle, children }: { title: string; subti
             <p className="m-0 text-[15px] text-muted">{subtitle}</p>
           </div>
           {children}
-          <p className="m-0 text-center text-xs text-faint">IDT's wallet is forked from True Markets' Tensho example and runs on True Markets gateway rails.</p>
+          <p className="m-0 text-center text-xs text-faint">cryptoshi's wallet is forked from True Markets' Tensho example and runs on True Markets gateway rails.</p>
         </div>
       </section>
     </div>

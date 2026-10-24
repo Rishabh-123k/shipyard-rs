@@ -40,7 +40,7 @@ export class ResetTokens {
 export type ResetNotifier = (email: string, link: string) => void;
 
 // No email service is configured, so the link goes to the server's own terminal: only someone at this
-// machine can use it. Swap this for a real mailer before running IDT anywhere shared.
+// machine can use it. Swap this for a real mailer before running cryptoshi anywhere shared.
 export const printResetLink: ResetNotifier = (email, link) => {
   console.log(`\n[password reset] link for ${email} (valid 15 minutes, single use):\n  ${link}\n`);
 };

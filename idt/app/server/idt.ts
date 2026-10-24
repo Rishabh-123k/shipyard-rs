@@ -45,11 +45,11 @@ async function engine<T>(path: string, init: { method?: string; body?: unknown }
     headers: { Accept: "application/json", ...(init.body === undefined ? {} : { "Content-Type": "application/json" }) },
     body: init.body === undefined ? undefined : JSON.stringify(init.body),
   }).catch(() => {
-    throw new ApiError(503, "unavailable", "the IDT engine (journal and evidence) is unreachable, so nothing was traded");
+    throw new ApiError(503, "unavailable", "the cryptoshi engine (journal and evidence) is unreachable, so nothing was traded");
   });
   if (!res.ok) {
     const detail = ((await res.json().catch(() => ({}))) as { detail?: unknown }).detail;
-    const message = typeof detail === "string" ? detail : `IDT engine returned ${res.status}`;
+    const message = typeof detail === "string" ? detail : `cryptoshi engine returned ${res.status}`;
     throw new ApiError(res.status === 409 ? 409 : 503, res.status === 409 ? "failed_precondition" : "unavailable", message, {
       code: res.status === 409 ? "evidence_changed" : undefined,
     });

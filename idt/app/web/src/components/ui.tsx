@@ -196,10 +196,10 @@ export function Logo() {
   return (
     <div className="flex items-center gap-2.5">
       <div className="flex size-[34px] items-center justify-center border border-text font-mono text-sm font-medium">
-        ID
+        cs
       </div>
       <span className="flex flex-col leading-tight">
-        <span className="font-display text-[20px] font-bold tracking-tight">idt</span>
+        <span className="font-display text-[20px] font-bold tracking-tight">cryptoshi</span>
         <span className="font-mono text-[9px] whitespace-nowrap text-faint">implied distribution terminal</span>
       </span>
     </div>

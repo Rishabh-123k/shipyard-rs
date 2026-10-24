@@ -16,7 +16,7 @@ const resetBody = z.object({ token: z.string().min(16).max(128), password: z.str
 
 // Same answer whether or not the account exists, so this can't be used to discover emails.
 const FORGOT_REPLY = {
-  message: "If an account exists for that email, a reset link was printed to the terminal running the IDT server.",
+  message: "If an account exists for that email, a reset link was printed to the terminal running the cryptoshi server.",
 };
 
 function profile(customer: Customer) {

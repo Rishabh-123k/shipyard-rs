@@ -9,7 +9,7 @@ async function forward(fetchEngine: typeof fetch, url: URL, init: RequestInit = 
     ...init,
     headers: { Accept: "application/json", ...(init.body ? { "Content-Type": "application/json" } : {}) },
   }).catch(() => {
-    throw new ApiError(502, "unavailable", "the IDT engine is unreachable; start it with `npm run engine`");
+    throw new ApiError(502, "unavailable", "the cryptoshi engine is unreachable; start it with `npm run engine`");
   });
   if (!res.ok) {
     const body = (await res.json().catch(() => ({}))) as { detail?: unknown };

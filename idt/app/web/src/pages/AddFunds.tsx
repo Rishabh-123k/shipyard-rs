@@ -49,7 +49,7 @@ export function AddFunds() {
   const me = useMe();
 
   return (
-    <Page title="Add funds" subtitle="Send crypto from any wallet or exchange to your IDT wallet address.">
+    <Page title="Add funds" subtitle="Send crypto from any wallet or exchange to your cryptoshi wallet address.">
       {me.isPending && <Spinner />}
       {me.data && me.data.wallets.length === 0 && (
         <Banner title="Your wallet is still being set up">Sign in again to finish creating your addresses.</Banner>

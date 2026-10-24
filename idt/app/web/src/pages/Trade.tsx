@@ -250,7 +250,7 @@ function EvidencePanel({
             />
             I reviewed this evidence and I'm making this decision myself.
           </label>
-          <span className="text-xs text-faint">IDT never suggests or places trades on its own. Only your confirm click executes.</span>
+          <span className="text-xs text-faint">cryptoshi never suggests or places trades on its own. Only your confirm click executes.</span>
         </div>
       )}
     </Card>
@@ -544,7 +544,7 @@ export function Trade() {
           {evidenceAsset ? (
             <EvidencePanel asset={evidenceAsset} evidence={ev} selection={effective} onChange={setSelection} loading={evidence.isPending} />
           ) : (
-            <Banner title="No evidence for this token">IDT only trades BTC and ETH, the assets with prediction-market ladders.</Banner>
+            <Banner title="No evidence for this token">cryptoshi only trades BTC and ETH, the assets with prediction-market ladders.</Banner>
           )}
         </div>
       )}

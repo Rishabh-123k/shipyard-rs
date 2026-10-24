@@ -69,7 +69,7 @@ export function orderRoutes({ gateway, assets, guard, idt }: AppDeps) {
       throw new ApiError(400, "invalid_argument", `asset_id: ${asset_id} is not offered for trading`);
     }
     if (!idt.assetFor(asset.symbol)) {
-      throw new ApiError(400, "invalid_argument", `${asset.symbol} has no implied distribution to trade against; IDT trades BTC and ETH`);
+      throw new ApiError(400, "invalid_argument", `${asset.symbol} has no implied distribution to trade against; cryptoshi trades BTC and ETH`);
     }
     // A buy is sized in USDC, so it can be checked before anything is created upstream.
     if (side === "buy" && Number(amount) > guard.maxOrderUsd) throw overCap(Number(amount));

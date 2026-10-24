@@ -137,7 +137,7 @@ export function Send() {
 
           <div className="flex items-center gap-2.5 rounded-xl border border-line bg-ink px-3.5 py-3 text-sm text-muted">
             <span className="font-bold text-text">Network</span>
-            {network} · the only network this asset can be sent on from IDT
+            {network} · the only network this asset can be sent on from cryptoshi
           </div>
         </Card>
 
