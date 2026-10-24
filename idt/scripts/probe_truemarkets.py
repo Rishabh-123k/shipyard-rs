@@ -5,12 +5,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from idt.config import FIXTURES, TM_KEY_FILE  # noqa: E402
-from truemarkets import Client  # noqa: E402
-from truemarkets._generated.gateway.models import OrderSide, QuoteRequest, QuoteRequestQtyUnit  # noqa: E402
-
-
-def dump(obj):
-    return obj.to_dict() if hasattr(obj, "to_dict") else repr(obj)
+from idt.sources.truemarkets_client import TrueMarkets  # noqa: E402
 
 
 def save(name: str, data) -> None:
@@ -22,22 +17,27 @@ def save(name: str, data) -> None:
 def main() -> None:
     if not TM_KEY_FILE:
         sys.exit("TM_KEY_FILE not set in .env")
-    with Client(key_file=TM_KEY_FILE) as c:
-        print("gateway ops:", [n for n in dir(c.gateway) if not n.startswith("_")])
-        assets = dump(c.gateway.list_assets())
-        save("list_assets", assets)
-        for a in (assets.get("data") or []) if isinstance(assets, dict) else []:
-            print(f" - {a.get('symbol'):8} tradeable={a.get('tradeable')} chain={a.get('chain')} id={a.get('id')}")
+    tm = TrueMarkets()
+    print("gateway ops:", [n for n in dir(tm.gateway) if not n.startswith("_")])
+    assets = tm.list_assets()
+    save("list_assets", assets)
+    for a in assets.get("data") or []:
+        if a.get("tradeable"):
+            print(f" - {a.get('symbol'):8} chain={a.get('chain')} stable={a.get('stable')} id={a.get('id')}")
 
-        save("balances", dump(c.gateway.get_balances()))
+    bal = tm.balances()
+    save("balances", bal)
+    print("balances:", json.dumps(bal)[:400])
 
-        for side in (OrderSide.BUY, OrderSide.SELL):
-            for base in ("BTC", "ETH"):
-                body = QuoteRequest(base_asset=base, quote_asset="USDC", qty="10",
-                                    qty_unit=QuoteRequestQtyUnit.QUOTE, side=side)
-                q = dump(c.gateway.compute_quote(body=body))
-                print(base, side.value, q)
-                save(f"quote_{base}_{side.value}", q)
+    for base in ("BTC", "ETH"):
+        for side in ("buy", "sell"):
+            try:
+                q = tm.quote(base, side, 10)
+            except Exception as e:  # noqa: BLE001 - probe reports any failure
+                q = {"error": repr(e)}
+            print(base, side, q)
+            save(f"quote_{base}_{side}", q)
+    tm.close()
 
 
 if __name__ == "__main__":

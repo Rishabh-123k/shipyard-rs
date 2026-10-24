@@ -2,3 +2,4 @@
 .venv/
 __pycache__/
 idt/truemarkets-org-api-key-b4adc860.json
+truemarkets-*.json

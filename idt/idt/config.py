@@ -25,6 +25,7 @@ SNOWFLAKE = {
     "warehouse": os.getenv("SNOWFLAKE_WAREHOUSE", ""),
     "database": os.getenv("SNOWFLAKE_DATABASE", "IDT"),
     "schema": os.getenv("SNOWFLAKE_SCHEMA", "PUBLIC"),
+    "role": os.getenv("SNOWFLAKE_ROLE") or None,
 }
 
 DRY_RUN = os.getenv("DRY_RUN", "true").lower() != "false"

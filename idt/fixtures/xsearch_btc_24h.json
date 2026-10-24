@@ -1,0 +1,77 @@
+{
+  "model": "grok-4.7",
+  "from_date": "2026-10-23T16:07:54.028405+00:00",
+  "to_date": "2026-10-24T16:07:54.028405+00:00",
+  "content": "Over the last day on X, Bitcoin chatter is centered on a tight range around **$80k\u2013$82k**, with fear elevated but price not breaking down hard. Views split between \u201cchop then dump\u201d and \u201cdip is buyable.\u201d\n\n### Price level and mood\n- **Harry Lin** (@harry35979565) notes the Fear & Greed Index at **25** while BTC holds above **$80K**, and says spot Bitcoin ETFs reportedly took in over **$1B** in net inflows over three days. He frames it as fear rising faster than price is falling.  \n  https://x.com/harry35979565/status/2113779411829010852\n\n- **joseph** (@FreepanO) summarizes trusted KOLs: BTC chopping **$80.8k\u2013$82.1k**, near **$81.5k** after a risk-off day (he cites roughly BTC \u22124.1%). Bears want a retest of **$82.5k\u2013$83.5k** then a dump toward **$75k**; bulls call it a mid-cycle correction. His take: hold **$81.5k** and a squeeze toward **$83k** is possible; lose **$80.8k** and the **$75k** crowd gets a shot.  \n  https://x.com/FreepanO/status/2113611796472795239\n\n- **The Daily Degen** (@thedailydegenhq) puts BTC at **$81.3k** \u2014 about **35.7%** below its ATH and about **40.5%** above this year\u2019s cycle low \u2014 and quotes Jamie Coutts saying the low is in and macro dips are for buying.  \n  https://x.com/thedailydegenhq/status/2113760532658299023\n\n### Near-term trade takes\n- **MANFORD** (@Manford43): if price holds above **$80,600** on the 4H, he looks for a bounce toward **$82,150** as a sell zone.  \n  https://x.com/Manford43/status/2113782455081841023\n\n- **Hydr Trades** (@HYDRnxs): a brief break below **$80K** could trap shorts and shake out weak hands before a stronger upside move.  \n  https://x.com/HYDRnxs/status/2113781670654714342\n\n- **Wien Euro Reserve Coin** (@EuroFinanceClub): BTC swept the previous week high and dumped back under the weekly open; they expect range-bound liquidity hunts, with **$81.2k** then **$81k\u2013$80k** if a red trendline fails.  \n  https://x.com/EuroFinanceClub/status/2113780862021988858\n\n- **Jerid** (@TheOnlyJerid): calls the range \u201cdiabolical\u201d and says the lean is bearish for now; anyone claiming certainty is wrong.  \n  https://x.com/TheOnlyJerid/status/2113593711833805170\n\n- **Raji** (@Raji_ox): still sees a downtrend, with price around **$81,603**, a possible tap of a 4H zone near **$87,000**, then a dump toward **$77K**.  \n  https://x.com/Raji_ox/status/2113530668646797473\n\n### Macro and tail-risk noise\n- **Chandler Macro** (@Chandler_Macro) stays cautious on Bitcoin into the Oct 23 US close, citing stronger inflation limiting the case for lower rates.  \n  https://x.com/Chandler_Macro/status/2113781737830625293\n\n- **Mohsen** (@boromand1) pushes a geopolitical crash scenario (Iran-related selling and cable cuts) with BTC under **$20,000** \u2014 an outlier versus the rest of the tape, which is debating **$75k\u2013$83k**.  \n  https://x.com/boromand1/status/2113781883473461286\n\n**Bottom line from the posts:** consensus price talk is **~$81k**, sentiment is fearful, ETF inflows are being cited as a counterweight, and the immediate fight is whether **~$80k\u2013$80.8k** holds or gives way toward the mid-**$70ks**. This is social-media opinion, not a price feed or advice.",
+  "citations": [
+    "https://x.com/i/status/2113781883473461286",
+    "https://x.com/i/status/2113760532658299023",
+    "https://x.com/i/status/2113779411829010852",
+    "https://x.com/i/status/2113781921096307194",
+    "https://x.com/i/status/2113611796472795239",
+    "https://x.com/i/status/2113530668646797473",
+    "https://x.com/i/status/2113782085890560041",
+    "https://x.com/i/status/2113782297388351606",
+    "https://x.com/i/status/2113780862021988858",
+    "https://x.com/i/status/2113781494783299796",
+    "https://x.com/i/status/2113780906175746144",
+    "https://x.com/i/status/2113780692295553077",
+    "https://x.com/i/status/2113732694450245845",
+    "https://x.com/i/status/2113593711833805170",
+    "https://x.com/i/status/2113781670654714342",
+    "https://x.com/i/status/2113782119126450623",
+    "https://x.com/i/status/2113781737830625293",
+    "https://x.com/i/status/2113782455081841023"
+  ],
+  "inline_citations": [],
+  "tool_calls": [
+    {
+      "id": "call-c0757210-2119-4158-a78e-92ba85a315ee-0",
+      "type": "TOOL_CALL_TYPE_X_SEARCH_TOOL",
+      "function": {
+        "name": "x_keyword_search",
+        "arguments": "{\"query\":\"Bitcoin price OR BTC OR #Bitcoin (price OR pump OR dump OR ATH OR crash)\",\"limit\":\"8\",\"mode\":\"Latest\"}"
+      }
+    },
+    {
+      "id": "call-c0757210-2119-4158-a78e-92ba85a315ee-1",
+      "type": "TOOL_CALL_TYPE_X_SEARCH_TOOL",
+      "function": {
+        "name": "x_semantic_search",
+        "arguments": "{\"query\":\"What are people saying about the Bitcoin price right now\",\"limit\":\"5\",\"from_date\":\"2026-03-21\"}"
+      }
+    },
+    {
+      "id": "call-c0757210-2119-4158-a78e-92ba85a315ee-2",
+      "type": "TOOL_CALL_TYPE_X_SEARCH_TOOL",
+      "function": {
+        "name": "x_keyword_search",
+        "arguments": "{\"query\":\"Bitcoin OR $BTC OR BTC (price OR \\\"81k\\\" OR \\\"80k\\\" OR \\\"82k\\\") since:2026-10-22\",\"limit\":\"6\",\"mode\":\"Latest\"}"
+      }
+    },
+    {
+      "id": "call-c0757210-2119-4158-a78e-92ba85a315ee-3",
+      "type": "TOOL_CALL_TYPE_X_SEARCH_TOOL",
+      "function": {
+        "name": "x_keyword_search",
+        "arguments": "{\"query\":\"($BTC OR Bitcoin) (above OR below OR holding OR dump OR pump OR crash) filter:has_engagement\",\"limit\":\"5\",\"mode\":\"Latest\"}"
+      }
+    }
+  ],
+  "server_side_tool_usage": "{'SERVER_SIDE_TOOL_X_SEARCH': 4}",
+  "usage": {
+    "completionTokens": 1113,
+    "promptTokens": 16372,
+    "totalTokens": 17931,
+    "promptTextTokens": 16372,
+    "reasoningTokens": 446,
+    "cachedPromptTextTokens": 9984,
+    "serverSideToolsUsed": [
+      "SERVER_SIDE_TOOL_X_SEARCH",
+      "SERVER_SIDE_TOOL_X_SEARCH",
+      "SERVER_SIDE_TOOL_X_SEARCH",
+      "SERVER_SIDE_TOOL_X_SEARCH"
+    ],
+    "costInUsdTicks": "1271220000"
+  }
+}
