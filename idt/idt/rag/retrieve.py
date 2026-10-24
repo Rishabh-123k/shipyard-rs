@@ -3,8 +3,9 @@ from __future__ import annotations
 
 from datetime import timedelta
 
-from idt import config
+from idt import config, sentiment_read
 from idt.model.distribution import prob_above
+from idt.model.sentiment import label_for
 from idt.rag.parse import Query
 from idt.store import snowflake as store
 
@@ -59,6 +60,11 @@ def events(q: Query) -> list[dict]:
             "wasserstein": r["wasserstein"], "reasons": r["reasons"], "xsearch_status": r["xsearch_status"],
             "similarity": r["sim"],
         })
+    sent = sentiment_read.by_event([{"event_id": e["event_id"], "asset": e["asset"],
+                                     "d_p_above_spot": None if e["p_before"] is None or e["p_after"] is None
+                                     else e["p_after"] - e["p_before"]} for e in out])
+    for e in out:
+        e["sentiment"] = sent[e["event_id"]]
     return sorted(out, key=lambda e: e["window_end"])
 
 
@@ -77,6 +83,7 @@ def posts(q: Query, event_ids: list[str]) -> list[dict]:
                 WHERE {scope}
                 GROUP BY ep.post_id)
             SELECT p.post_id, p.url, p.author, p.posted_at, p.text, p.text_source, l.modes, l.in_window, l.event_ids,
+                   p.sentiment_json,
                    VECTOR_COSINE_SIMILARITY(p.embedding, qv.v) AS sim
             FROM POSTS p JOIN linked l ON l.post_id = p.post_id, qv
             WHERE p.embedding IS NOT NULL AND p.posted_at BETWEEN %s AND %s
@@ -84,7 +91,11 @@ def posts(q: Query, event_ids: list[str]) -> list[dict]:
             LIMIT {MAX_POSTS}""",
         (config.EMBED_MODEL, q.text, *scope_params, q.start - lookback, q.end),
     )
-    return [{**r, "posted_at": r["posted_at"].isoformat()} for r in rows if r["sim"] >= config.RAG_SIMILARITY_FLOOR]
+    asset = q.assets[0] if len(q.assets) == 1 else None
+    return [{k: v for k, v in {**r, "posted_at": r["posted_at"].isoformat(),
+                               "sentiment": label_for(r["sentiment_json"], asset) if asset else None}.items()
+             if k != "sentiment_json"}
+            for r in rows if r["sim"] >= config.RAG_SIMILARITY_FLOOR]
 
 
 def current_state(q: Query) -> list[dict]:

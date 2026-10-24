@@ -48,13 +48,25 @@ def event_line(i: int, e: dict) -> str:
         f"Median {_money(e['median_before'])} -> {_money(e['median_after'])}. "
         f"Probability of finishing above {_money(e['level'])}: {_pct(e['p_before'])} -> {_pct(e['p_after'])}"
         f"{'' if dp is None else f' ({dp:+.1f} percentage points)'}."
+        + sentiment_clause(e)
     )
+
+
+def sentiment_clause(e: dict) -> str:
+    s = e.get("sentiment") or {}
+    idx = s.get("overall") or {}
+    if not idx.get("scored"):
+        return ""
+    return (f" Posts inside the window toward the {e['asset']} price (Snowflake AI_SENTIMENT): "
+            f"{idx['positive']} positive, {idx['negative']} negative, {idx['neutral'] + idx['mixed']} neutral or mixed. "
+            f"{s['alignment']['text']}")
 
 
 def post_line(i: int, p: dict) -> str:
     when = "inside the shift window" if p["in_window"] else "outside the shift window"
     text = p["text"] or "(text not returned; link only)"
-    return f'[P{i}] @{p["author"] or "unknown"} at {_utc(p["posted_at"])} ({when}): "{text}"'
+    tone = f", sentiment toward the price: {p['sentiment']}" if p.get("sentiment") else ""
+    return f'[P{i}] @{p["author"] or "unknown"} at {_utc(p["posted_at"])} ({when}{tone}): "{text}"'
 
 
 def state_line(i: int, s: dict) -> str:
@@ -104,7 +116,8 @@ def ask(question: str, now: datetime | None = None) -> dict:
     evidence = "\n".join(blocks)
 
     raw = complete(PROMPT.format(question=question, evidence=evidence))
-    answer, warnings = enforce(raw, evidence, ids)
+    # Numbers the user typed (e.g. "last 3 hours") may be echoed; anything else must come from the evidence.
+    answer, warnings = enforce(raw, f"{evidence}\n{question}", ids)
     cited = cited_ids(answer)
     if found_posts and not any(c.startswith("P") for c in cited):
         warnings.append("the answer cites no posts, so it explains no cause")

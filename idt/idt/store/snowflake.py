@@ -42,8 +42,9 @@ DDL = [
         snapshot_id STRING, event_id STRING, cited_post_ids VARIANT)""",
 ]
 
-_lock = threading.RLock()
-_conn = None
+# One connection per thread: a slow background statement (AI_EMBED / AI_SENTIMENT backfills) must not
+# block request threads, which a single shared, locked connection did.
+_local = threading.local()
 
 
 def new_id() -> str:
@@ -51,22 +52,21 @@ def new_id() -> str:
 
 
 def connect():
-    global _conn
-    with _lock:
-        if _conn is None or _conn.is_closed():
-            params = {k: v for k, v in config.SNOWFLAKE.items() if v}
-            _conn = snowflake.connector.connect(**params, client_session_keep_alive=True)
-        return _conn
+    conn = getattr(_local, "conn", None)
+    if conn is None or conn.is_closed():
+        params = {k: v for k, v in config.SNOWFLAKE.items() if v}
+        conn = snowflake.connector.connect(**params, client_session_keep_alive=True)
+        _local.conn = conn
+    return conn
 
 
 @contextmanager
 def cursor(dict_rows: bool = False) -> Iterator[Any]:
-    with _lock:
-        cur = connect().cursor(DictCursor) if dict_rows else connect().cursor()
-        try:
-            yield cur
-        finally:
-            cur.close()
+    cur = connect().cursor(DictCursor) if dict_rows else connect().cursor()
+    try:
+        yield cur
+    finally:
+        cur.close()
 
 
 def query(sql: str, params: Any = None) -> list[dict]:
@@ -89,6 +89,7 @@ def ensure_schema() -> None:
         for stmt in DDL:
             cur.execute(stmt)
         cur.execute("ALTER TABLE SNAPSHOTS ADD COLUMN IF NOT EXISTS source STRING")
+        cur.execute("ALTER TABLE POSTS ADD COLUMN IF NOT EXISTS sentiment_json VARIANT")
         for col in ("customer_id STRING", "evidence_json VARIANT", "updated_at TIMESTAMP_TZ", "error STRING"):
             cur.execute(f"ALTER TABLE TRADES ADD COLUMN IF NOT EXISTS {col}")
 
@@ -248,6 +249,17 @@ def delete_backfill() -> None:
         cur.execute("DELETE FROM SNAPSHOTS WHERE source = 'backfill'")
 
 
+def event_post_sentiment(event_ids: list[str]) -> list[dict]:
+    if not event_ids:
+        return []
+    return query(
+        f"""SELECT ep.event_id, ep.query_mode, ep.in_window, p.post_id, p.sentiment_json
+            FROM EVENT_POSTS ep JOIN POSTS p ON p.post_id = ep.post_id
+            WHERE ep.event_id IN ({','.join(['%s'] * len(event_ids))}) AND p.text IS NOT NULL""",
+        tuple(event_ids),
+    )
+
+
 def embed_pending() -> None:
     """Embed every row that has text but no vector, in-database via AI_EMBED."""
     m = config.EMBED_MODEL
@@ -258,6 +270,9 @@ def embed_pending() -> None:
                     "WHERE embedding IS NULL AND summary_text IS NOT NULL", (m,))
         cur.execute("UPDATE POSTS SET embedding = AI_EMBED(%s, COALESCE(author, '') || ': ' || text) "
                     "WHERE embedding IS NULL AND text IS NOT NULL", (m,))
+        # Sentiment toward each tradeable asset's price, computed in-database (Snowflake AI_SENTIMENT).
+        cur.execute("UPDATE POSTS SET sentiment_json = AI_SENTIMENT(text, ['Bitcoin price', 'Ethereum price']) "
+                    "WHERE sentiment_json IS NULL AND text IS NOT NULL")
 
 
 LIVE_TRADE_STATUSES_EXCLUDED = ("failed", "canceled", "rejected")

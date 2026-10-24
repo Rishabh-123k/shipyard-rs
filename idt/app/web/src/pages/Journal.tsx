@@ -1,3 +1,4 @@
+import { AlignmentNote } from "../components/sentiment.tsx";
 import { ExternalLink } from "lucide-react";
 import { Link } from "react-router";
 import { Page } from "../components/AppShell.tsx";
@@ -99,6 +100,7 @@ function Entry({ e }: { e: JournalEntry }) {
             {venueMeta(e.evidence.event.venue).label} · {etStamp(e.evidence.event.window_start)} → {etStamp(e.evidence.event.window_end)} ·{" "}
             {e.evidence.event.reasons[0]}
           </span>
+          {e.evidence.event.sentiment && e.evidence.event.sentiment.overall.scored > 0 && <AlignmentNote s={e.evidence.event.sentiment} />}
         </div>
       )}
 

@@ -3,7 +3,9 @@ from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
 
+from idt import sentiment_read
 from idt.rag.retrieve import _median, _p
+from idt.model.sentiment import label_for
 from idt.store import snowflake as store
 
 
@@ -22,7 +24,9 @@ def list_shifts(asset: str, hours: float) -> list[dict]:
            ORDER BY e.window_end DESC""",
         (asset, since),
     )
+    sent = sentiment_read.by_event(rows)
     return [{
+        "sentiment": sent[r["event_id"]],
         "event_id": r["event_id"], "asset": r["asset"], "venue": r["venue"],
         "resolution_at": r["resolution_date"].isoformat(), "window_start": r["window_start"].isoformat(),
         "window_end": r["window_end"].isoformat(), "level": r["level"], "d_median": r["d_median"],
@@ -41,7 +45,8 @@ def shift_detail(event_id: str) -> dict | None:
     before = store.load_snapshot(e["prev_snapshot_id"])
     after = store.load_snapshot(e["snapshot_id"])
     links = store.query(
-        """SELECT ep.query_mode, ep.in_window, ep.run_id, p.post_id, p.url, p.author, p.posted_at, p.text, p.text_source
+        """SELECT ep.query_mode, ep.in_window, ep.run_id, p.post_id, p.url, p.author, p.posted_at, p.text, p.text_source,
+                  p.sentiment_json
            FROM EVENT_POSTS ep JOIN POSTS p ON p.post_id = ep.post_id
            WHERE ep.event_id = %s ORDER BY p.posted_at""",
         (event_id,),
@@ -58,6 +63,7 @@ def shift_detail(event_id: str) -> dict | None:
         posts.setdefault(r["query_mode"], []).append({
             "post_id": r["post_id"], "url": r["url"], "author": r["author"], "posted_at": r["posted_at"].isoformat(),
             "text": r["text"], "text_source": r["text_source"], "in_window": r["in_window"],
+            "sentiment": label_for(r["sentiment_json"], e["asset"]),
         })
     return {
         "event_id": e["event_id"], "asset": e["asset"], "venue": e["venue"],
@@ -65,6 +71,7 @@ def shift_detail(event_id: str) -> dict | None:
         "window_end": e["window_end"].isoformat(), "level": e["level"], "reasons": e["reasons"],
         "d_median": e["d_median"], "d_p_above_spot": e["d_p_above_spot"], "wasserstein": e["wasserstein"],
         "xsearch_status": e["xsearch_status"], "summary_text": e["summary_text"],
+        "sentiment": sentiment_read.by_event([{**e, "asset": e["asset"]}])[e["event_id"]],
         "before": before, "after": after, "posts": posts,
         "runs": [{**r, "search_from": r["search_from"].isoformat(), "search_to": r["search_to"].isoformat()} for r in runs],
     }

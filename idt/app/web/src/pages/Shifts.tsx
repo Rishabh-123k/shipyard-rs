@@ -1,3 +1,4 @@
+import { CrowdVsMarket, SentimentBar, SentimentChip } from "../components/sentiment.tsx";
 import { ExternalLink } from "lucide-react";
 import { useState } from "react";
 import { useSearchParams } from "react-router";
@@ -55,6 +56,13 @@ function ShiftCard({ r, selected, onSelect }: { r: ShiftRow; selected: boolean; 
         <span>{r.n_posts ? `${r.n_posts} posts` : STATUS[r.xsearch_status] ?? r.xsearch_status}</span>
         {r.source === "backfill" && <span className="text-amber">reconstructed from price history</span>}
       </span>
+      {r.sentiment.overall.scored > 0 && (
+        <span className="flex flex-col gap-1">
+          <SentimentBar idx={r.sentiment.overall} compact />
+          {r.sentiment.alignment.state === "divergent" && <span className="text-xs text-amber">crowd and prices disagree</span>}
+          {r.sentiment.alignment.state === "aligned" && <span className="text-xs text-faint">crowd and prices agree</span>}
+        </span>
+      )}
     </button>
   );
 }
@@ -63,7 +71,9 @@ function PostCard({ p }: { p: XPostView }) {
   return (
     <div className="flex flex-col gap-2 rounded-xl border border-line px-4 py-3">
       <div className="flex items-center justify-between gap-3 text-[13px]">
-        <span className="text-text">@{p.author ?? "unknown"}</span>
+        <span className="flex items-center gap-2 text-text">
+          @{p.author ?? "unknown"} <SentimentChip label={p.sentiment} />
+        </span>
         <span className="flex items-center gap-3 text-faint">
           <span className={p.in_window ? "text-up" : ""}>{p.in_window ? "inside window" : "outside window"}</span>
           {etStamp(p.posted_at)}
@@ -144,6 +154,7 @@ function Detail({ d }: { d: ShiftDetail }) {
           />
         </div>
         {searching && <Spinner label="Grok is searching X for this window" />}
+        {d.sentiment.overall.scored > 0 && <CrowdVsMarket s={d.sentiment} />}
         {d.xsearch_status === "not_searched" && (
           <span className="text-sm text-muted">This shift wasn't among the ones searched on X (searches are capped to the largest moves).</span>
         )}

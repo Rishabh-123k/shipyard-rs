@@ -1,3 +1,4 @@
+import { SentimentChip } from "../components/sentiment.tsx";
 import { useMutation } from "@tanstack/react-query";
 import { ExternalLink, SendHorizontal } from "lucide-react";
 import { useState, type FormEvent, type ReactNode } from "react";
@@ -126,6 +127,7 @@ function Answer({ r, n }: { r: AskResponse; n: number }) {
                 <span className="flex items-center gap-2">
                   <span className="font-mono text-cyan">{p.ref}</span>
                   <span className="text-text">@{p.author ?? "unknown"}</span>
+                  <SentimentChip label={p.sentiment} />
                   {!cited.has(p.ref) && <span className="text-xs text-faint">not cited</span>}
                 </span>
                 <span className="flex items-center gap-3 text-xs text-faint">

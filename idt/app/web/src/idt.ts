@@ -128,6 +128,8 @@ export function compactPrice(v: number): string {
 }
 
 export interface ShiftRow {
+  sentiment: ShiftSentiment;
+
   event_id: string;
   asset: IdtAsset;
   venue: string;
@@ -159,6 +161,8 @@ export interface StoredSnapshot {
 }
 
 export interface XPostView {
+  sentiment: SentimentLabel | null;
+
   post_id: string;
   url: string;
   author: string | null;
@@ -181,6 +185,8 @@ export interface XRun {
 }
 
 export interface ShiftDetail {
+  sentiment: ShiftSentiment;
+
   event_id: string;
   asset: IdtAsset;
   venue: string;
@@ -226,6 +232,8 @@ export interface AskState {
 }
 
 export interface AskPost {
+  sentiment?: SentimentLabel | null;
+
   ref: string;
   post_id: string;
   url: string;
@@ -286,6 +294,8 @@ export interface EvidenceLadder {
 }
 
 export interface EvidencePost {
+  sentiment: SentimentLabel | null;
+
   post_id: string;
   url: string;
   author: string | null;
@@ -295,6 +305,8 @@ export interface EvidencePost {
 }
 
 export interface EvidenceEvent {
+  sentiment: ShiftSentiment;
+
   event_id: string;
   venue: string;
   resolution_at: string;
@@ -370,4 +382,24 @@ export interface JournalEntry {
 
 export function useJournal() {
   return useQuery({ queryKey: ["journal"], queryFn: () => api<JournalEntry[]>("/api/journal"), refetchInterval: 30_000 });
+}
+
+export type SentimentLabel = "positive" | "negative" | "neutral" | "mixed";
+
+export interface SentimentIndex {
+  positive: number;
+  negative: number;
+  neutral: number;
+  mixed: number;
+  posts: number;
+  scored: number;
+  score: number | null;
+}
+
+export interface ShiftSentiment {
+  overall: SentimentIndex;
+  open: SentimentIndex;
+  curated: SentimentIndex;
+  alignment: { state: "aligned" | "divergent" | "split" | "market_flat" | "insufficient"; text: string };
+  source: string;
 }

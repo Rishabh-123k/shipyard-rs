@@ -6,7 +6,9 @@ import threading
 from datetime import datetime, timedelta, timezone
 
 from idt import config
+from idt import sentiment_read
 from idt.model.distribution import prob_above
+from idt.model.sentiment import label_for
 from idt.snapshots import Snapshotter
 from idt.store import snowflake as store
 
@@ -83,18 +85,24 @@ def _latest_event(asset: str) -> dict | None:
         return None if x.clamped else x.prob
 
     posts = store.query(
-        """SELECT DISTINCT p.post_id, p.url, p.author, p.posted_at, p.text, ep.in_window
+        """SELECT DISTINCT p.post_id, p.url, p.author, p.posted_at, p.text, ep.in_window, p.sentiment_json
            FROM EVENT_POSTS ep JOIN POSTS p ON p.post_id = ep.post_id
            WHERE ep.event_id = %s AND p.text IS NOT NULL
            ORDER BY ep.in_window DESC, p.posted_at DESC LIMIT 4""",
         (r["event_id"],),
     )
+    p_before, p_after = p(r["prev_curve"]), p(r["now_curve"])
+    d_p = None if p_before is None or p_after is None else p_after - p_before
+    sent = sentiment_read.by_event([{"event_id": r["event_id"], "asset": asset, "d_p_above_spot": d_p}])[r["event_id"]]
     return {
+        "sentiment": sent,
         "event_id": r["event_id"], "venue": r["venue"], "resolution_at": r["resolution_date"].isoformat(),
         "window_start": r["window_start"].isoformat(), "window_end": r["window_end"].isoformat(),
         "level": r["level"], "reasons": r["reasons"], "source": r["source"], "xsearch_status": r["xsearch_status"],
-        "p_before": p(r["prev_curve"]), "p_after": p(r["now_curve"]),
-        "posts": [{**x, "posted_at": x["posted_at"].isoformat()} for x in posts],
+        "p_before": p_before, "p_after": p_after,
+        "posts": [{k: v for k, v in {**x, "posted_at": x["posted_at"].isoformat(),
+                                      "sentiment": label_for(x["sentiment_json"], asset)}.items() if k != "sentiment_json"}
+                  for x in posts],
     }
 
 

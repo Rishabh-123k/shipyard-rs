@@ -1,3 +1,4 @@
+import { CrowdVsMarket, SentimentChip } from "../components/sentiment.tsx";
 import { ExternalLink } from "lucide-react";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { useSearchParams } from "react-router";
@@ -195,6 +196,7 @@ function EvidencePanel({
                 </span>
                 {ev.source === "backfill" && <span className="block text-xs text-amber">reconstructed from price history</span>}
               </div>
+              {ev.sentiment && ev.sentiment.overall.scored > 0 && <CrowdVsMarket s={ev.sentiment} title="Crowd vs market in this window" />}
               {ev.posts.map((p) => {
                 const checked = selection.postIds.includes(p.post_id);
                 return (
@@ -210,6 +212,7 @@ function EvidencePanel({
                     <span className="flex min-w-0 flex-col gap-1">
                       <span className="flex items-center gap-2 text-text">
                         @{p.author ?? "unknown"}
+                        <SentimentChip label={p.sentiment} />
                         <span className="text-xs text-faint">{etStamp(p.posted_at)}</span>
                         <a href={p.url} target="_blank" rel="noreferrer" onClick={(e) => e.stopPropagation()} className="flex items-center text-xs">
                           X <ExternalLink aria-hidden className="ml-0.5 size-3" />
