@@ -1,0 +1,9 @@
+node_modules/
+dist/
+.env
+data/
+prompts/
+designs/
+specs/
+.secrets/*
+!.secrets/.gitkeep
